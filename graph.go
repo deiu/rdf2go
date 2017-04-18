@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	rdf "github.com/deiu/gon3"
@@ -80,14 +78,11 @@ func (g *Graph) URI() string {
 func term2rdf(t Term) rdf.Term {
 	switch t := t.(type) {
 	case *BlankNode:
-		id, err := strconv.Atoi(t.ID)
-		if err != nil {
-			id = rand.Int()
-		}
+		id := t.RawValue()
 		node := rdf.NewBlankNode(id)
 		return node
 	case *Resource:
-		node, _ := rdf.NewIRI(t.URI)
+		node, _ := rdf.NewIRI(t.RawValue())
 		return node
 	case *Literal:
 		if t.Datatype != nil {
@@ -107,7 +102,7 @@ func term2rdf(t Term) rdf.Term {
 func rdf2term(term rdf.Term) Term {
 	switch term := term.(type) {
 	case *rdf.BlankNode:
-		return NewBlankNode(term.String())
+		return NewBlankNode(term.RawValue())
 	case *rdf.Literal:
 		if len(term.LanguageTag) > 0 {
 			return NewLiteralWithLanguage(term.LexicalForm, term.LanguageTag)
@@ -117,7 +112,7 @@ func rdf2term(term rdf.Term) Term {
 		}
 		return NewLiteral(term.RawValue())
 	case *rdf.IRI:
-		return NewResource(term.String())
+		return NewResource(term.RawValue())
 	}
 	return nil
 }

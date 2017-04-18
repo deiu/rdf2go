@@ -50,6 +50,11 @@ func (term Resource) String() (str string) {
 	return fmt.Sprintf("<%s>", term.URI)
 }
 
+// RawValue returns the string value of the a resource without brackets.
+func (term Resource) RawValue() (str string) {
+	return term.URI
+}
+
 // Equal returns whether this resource is equal to another.
 func (term Resource) Equal(other Term) bool {
 	if spec, ok := other.(*Resource); ok {
@@ -153,6 +158,10 @@ func NewAnonNode() (term Term) {
 // String returns the NTriples representation of the blank node.
 func (term BlankNode) String() (str string) {
 	return "_:" + term.ID
+}
+
+func (term BlankNode) RawValue() (str string) {
+	return term.ID
 }
 
 // Equal returns whether this blank node is equivalent to another.
