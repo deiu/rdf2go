@@ -5,13 +5,13 @@ import (
 )
 
 var mimeParser = map[string]string{
+	"text/turtle":               "turtle",
 	"application/ld+json":       "jsonld",
-	"application/json":          "internal",
 	"application/sparql-update": "internal",
 }
 
 var mimeSerializer = map[string]string{
-	"application/ld+json": "internal",
+	"application/ld+json": "jsonld",
 	"text/html":           "internal",
 }
 

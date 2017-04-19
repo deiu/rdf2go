@@ -7,10 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
-	"strings"
 
 	rdf "github.com/deiu/gon3"
 	jsonld "github.com/linkeddata/gojsonld"
@@ -258,7 +255,7 @@ func (g *Graph) Parse(reader io.Reader, mime string) error {
 		buf.ReadFrom(reader)
 		jsonData, err := jsonld.ReadJSON(buf.Bytes())
 		options := &jsonld.Options{}
-		options.Base = ""
+		options.Base = g.URI()
 		options.ProduceGeneralizedRdf = false
 		dataSet, err := jsonld.ToRDF(jsonData, options)
 		if err != nil {
@@ -282,43 +279,6 @@ func (g *Graph) Parse(reader io.Reader, mime string) error {
 	return nil
 }
 
-// ParseBase is used to parse RDF data from a reader, using the provided mime type and a base URI
-// func (g *Graph) ParseBase(reader io.Reader, mime string, baseURI string) {
-// 	if len(baseURI) < 1 {
-// 		baseURI = g.uri
-// 	}
-// 	parserName := mimeParser[mime]
-// 	if len(parserName) == 0 {
-// 		parserName = "guess"
-// 	}
-// 	parser := crdf.NewParser(parserName)
-// 	defer parser.Free()
-// 	out := parser.Parse(reader, baseURI)
-// 	for s := range out {
-// 		g.AddStatement(s)
-// 	}
-// }
-
-// ReadFile is used to read RDF data from a file into the graph
-func (g *Graph) ReadFile(filename string) {
-	stat, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return
-	} else if stat.IsDir() {
-		return
-	} else if !stat.IsDir() && err != nil {
-		log.Println(err)
-		return
-	}
-	f, err := os.OpenFile(filename, os.O_RDONLY, 0)
-	defer f.Close()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	g.Parse(f, "text/turtle")
-}
-
 // LoadURI is used to load RDF data from a specific URI
 func (g *Graph) LoadURI(uri string) (err error) {
 	doc := defrag(uri)
@@ -329,7 +289,7 @@ func (g *Graph) LoadURI(uri string) (err error) {
 	if len(g.uri) == 0 {
 		g.uri = doc
 	}
-	q.Header.Set("Accept", "text/turtle,text/n3,application/rdf+xml")
+	q.Header.Set("Accept", "text/turtle;q=1,application/ld+json;q=0.5")
 	r, err := httpClient.Do(q)
 	if err != nil {
 		return
@@ -345,6 +305,30 @@ func (g *Graph) LoadURI(uri string) (err error) {
 	return
 }
 
+// String is used to serialize a graph based on a given mime type and return a string
+func (g *Graph) String(mime string) (string, error) {
+	serializerName := mimeSerializer[mime]
+	var w bytes.Buffer
+	if serializerName == "jsonld" {
+		err := g.serializeJSONLd(&w)
+		return w.String(), err
+	}
+	// just return Turtle by default
+	err := g.serializeTurtle(&w)
+	return w.String(), err
+}
+
+// Serialize is used to serialize a graph based on a given mime type
+func (g *Graph) Serialize(w io.Writer, mime string) error {
+	serializerName := mimeSerializer[mime]
+	if serializerName == "jsonld" {
+		return g.serializeJSONLd(w)
+	}
+	// just return Turtle by default
+	return g.serializeTurtle(w)
+}
+
+// @TODO improve streaming
 func (g *Graph) serializeTurtle(w io.Writer) error {
 	var err error
 
@@ -355,31 +339,29 @@ func (g *Graph) serializeTurtle(w io.Writer) error {
 		triplesBySubject[s] = append(triplesBySubject[s], triple)
 	}
 
-	_, err = fmt.Fprint(w, "\n")
-	if err != nil {
-		return err
-	}
-
 	for subject, triples := range triplesBySubject {
 		_, err = fmt.Fprintf(w, "%s\n", subject)
 		if err != nil {
 			return err
 		}
 
-		for _, triple := range triples {
+		for key, triple := range triples {
 			p := encodeTerm(triple.Predicate)
 			o := encodeTerm(triple.Object)
 
+			if key == len(triples)-1 {
+				_, err = fmt.Fprintf(w, "  %s %s .", p, o)
+				if err != nil {
+					return err
+				}
+				break
+			}
 			_, err = fmt.Fprintf(w, "  %s %s ;\n", p, o)
 			if err != nil {
 				return err
 			}
 		}
 
-		_, err = fmt.Fprintf(w, "  .\n\n")
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -413,27 +395,12 @@ func (g *Graph) serializeJSONLd(w io.Writer) error {
 		}
 		r = append(r, one)
 	}
-	tree, err := json.Marshal(r)
+	bytes, err := json.Marshal(r[0])
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(w, string(tree))
+	fmt.Fprintf(w, string(bytes))
 	return nil
-}
-
-// Serialize is used to serialize a graph based on a given mime type
-func (g *Graph) Serialize(w io.Writer, mime string) error {
-	if mime == "application/ld+json" {
-		err := g.serializeJSONLd(w)
-		return err
-	}
-
-	serializerName := mimeSerializer[mime]
-	if len(serializerName) == 0 {
-		serializerName = "turtle"
-	}
-	err := g.serializeTurtle(w)
-	return err
 }
 
 // WriteFile is used to dump RDF from a Graph into a file
@@ -462,64 +429,3 @@ func (g *Graph) Serialize(w io.Writer, mime string) error {
 // 	serializer.AddN(ch)
 // 	return nil
 // }
-
-func encodeTerm(iterm Term) string {
-	switch term := iterm.(type) {
-	case *Resource:
-		return fmt.Sprintf("<%s>", term.URI)
-	case *Literal:
-		return term.String()
-	case *BlankNode:
-		return term.String()
-	}
-
-	return ""
-}
-
-// splitPrefix takes a given URI and splits it into a base URI and a local name
-func splitPrefix(uri string) (base string, name string) {
-	index := strings.LastIndex(uri, "#") + 1
-
-	if index > 0 {
-		return uri[:index], uri[index:]
-	}
-
-	index = strings.LastIndex(uri, "/") + 1
-
-	if index > 0 {
-		return uri[:index], uri[index:]
-	}
-
-	return "", uri
-}
-
-func brack(s string) string {
-	if len(s) > 0 && s[0] == '<' {
-		return s
-	}
-	if len(s) > 0 && s[len(s)-1] == '>' {
-		return s
-	}
-	return "<" + s + ">"
-}
-
-func debrack(s string) string {
-	if len(s) < 2 {
-		return s
-	}
-	if s[0] != '<' {
-		return s
-	}
-	if s[len(s)-1] != '>' {
-		return s
-	}
-	return s[1 : len(s)-1]
-}
-
-func defrag(s string) string {
-	lst := strings.Split(s, "#")
-	if len(lst) != 2 {
-		return s
-	}
-	return lst[0]
-}

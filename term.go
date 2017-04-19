@@ -172,3 +172,64 @@ func (term BlankNode) Equal(other Term) bool {
 
 	return false
 }
+
+func encodeTerm(iterm Term) string {
+	switch term := iterm.(type) {
+	case *Resource:
+		return fmt.Sprintf("<%s>", term.URI)
+	case *Literal:
+		return term.String()
+	case *BlankNode:
+		return term.String()
+	}
+
+	return ""
+}
+
+// splitPrefix takes a given URI and splits it into a base URI and a local name
+func splitPrefix(uri string) (base string, name string) {
+	index := strings.LastIndex(uri, "#") + 1
+
+	if index > 0 {
+		return uri[:index], uri[index:]
+	}
+
+	index = strings.LastIndex(uri, "/") + 1
+
+	if index > 0 {
+		return uri[:index], uri[index:]
+	}
+
+	return "", uri
+}
+
+func brack(s string) string {
+	if len(s) > 0 && s[0] == '<' {
+		return s
+	}
+	if len(s) > 0 && s[len(s)-1] == '>' {
+		return s
+	}
+	return "<" + s + ">"
+}
+
+func debrack(s string) string {
+	if len(s) < 2 {
+		return s
+	}
+	if s[0] != '<' {
+		return s
+	}
+	if s[len(s)-1] != '>' {
+		return s
+	}
+	return s[1 : len(s)-1]
+}
+
+func defrag(s string) string {
+	lst := strings.Split(s, "#")
+	if len(lst) != 2 {
+		return s
+	}
+	return lst[0]
+}
