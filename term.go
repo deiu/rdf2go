@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+
+	rdf "github.com/deiu/gon3"
+	jsonld "github.com/linkeddata/gojsonld"
 )
 
 // A Term is the value of a subject, predicate or object i.e. a IRI reference, blank node or
@@ -164,6 +167,84 @@ func (term BlankNode) Equal(other Term) bool {
 	}
 
 	return false
+}
+
+func term2rdf(t Term) rdf.Term {
+	switch t := t.(type) {
+	case *BlankNode:
+		id := t.RawValue()
+		node := rdf.NewBlankNode(id)
+		return node
+	case *Resource:
+		node, _ := rdf.NewIRI(t.RawValue())
+		return node
+	case *Literal:
+		if t.Datatype != nil {
+			iri, _ := rdf.NewIRI(t.Datatype.(*Resource).URI)
+			return rdf.NewLiteralWithDataType(t.Value, iri)
+		}
+		if len(t.Language) > 0 {
+			node := rdf.NewLiteralWithLanguage(t.Value, t.Language)
+			return node
+		}
+		node := rdf.NewLiteral(t.Value)
+		return node
+	}
+	return nil
+}
+
+func rdf2term(term rdf.Term) Term {
+	switch term := term.(type) {
+	case *rdf.BlankNode:
+		return NewBlankNode(term.RawValue())
+	case *rdf.Literal:
+		if len(term.LanguageTag) > 0 {
+			return NewLiteralWithLanguage(term.LexicalForm, term.LanguageTag)
+		}
+		if term.DatatypeIRI != nil && len(term.DatatypeIRI.String()) > 0 {
+			return NewLiteralWithDatatype(term.LexicalForm, NewResource(debrack(term.DatatypeIRI.String())))
+		}
+		return NewLiteral(term.RawValue())
+	case *rdf.IRI:
+		return NewResource(term.RawValue())
+	}
+	return nil
+}
+
+func jterm2term(term jsonld.Term) Term {
+	switch term := term.(type) {
+	case *jsonld.BlankNode:
+		return NewBlankNode(term.RawValue())
+	case *jsonld.Literal:
+		if len(term.Language) > 0 {
+			return NewLiteralWithLanguage(term.RawValue(), term.Language)
+		}
+		if term.Datatype != nil && len(term.Datatype.String()) > 0 {
+			return NewLiteralWithDatatype(term.Value, NewResource(term.Datatype.RawValue()))
+		}
+		return NewLiteral(term.Value)
+	case *jsonld.Resource:
+		return NewResource(term.RawValue())
+	}
+	return nil
+}
+
+func term2jterm(term Term) jsonld.Term {
+	switch term := term.(type) {
+	case *BlankNode:
+		return jsonld.NewBlankNode(term.RawValue())
+	case *Literal:
+		if len(term.Language) > 0 {
+			return jsonld.NewLiteralWithLanguage(term.Value, term.Language)
+		}
+		if term.Datatype != nil && len(term.Datatype.String()) > 0 {
+			return jsonld.NewLiteralWithDatatype(term.Value, jsonld.NewResource(debrack(term.Datatype.String())))
+		}
+		return jsonld.NewLiteral(term.Value)
+	case *Resource:
+		return jsonld.NewResource(term.RawValue())
+	}
+	return nil
 }
 
 func encodeTerm(iterm Term) string {

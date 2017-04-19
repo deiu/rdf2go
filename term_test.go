@@ -70,8 +70,9 @@ func TestTermBNodeEqual(t *testing.T) {
 }
 
 func TestTermNils(t *testing.T) {
-	t1 := Term(&fakeTerm{URI: "test"})
+	t1 := Term(&fakeTerm{URI: testUri})
 	assert.Nil(t, term2rdf(t1))
+	assert.Nil(t, term2jterm(t1))
 }
 
 func TestAtLang(t *testing.T) {
@@ -79,6 +80,35 @@ func TestAtLang(t *testing.T) {
 	assert.Equal(t, "@en", atLang("@en"))
 	assert.Equal(t, "@e", atLang("e"))
 	assert.Equal(t, "", atLang(""))
+}
+
+func TestEncodeTerm(t *testing.T) {
+	iterm := NewResource(testUri)
+	assert.Equal(t, iterm.String(), encodeTerm(iterm))
+	iterm = NewBlankNode("1")
+	assert.Equal(t, iterm.String(), encodeTerm(iterm))
+	iterm = NewLiteral("value")
+	assert.Equal(t, iterm.String(), encodeTerm(iterm))
+	iterm = Term(&fakeTerm{URI: testUri})
+	assert.Equal(t, "", encodeTerm(iterm))
+}
+
+func TestSplitPrefix(t *testing.T) {
+	hashUri := testUri + "#me"
+	base, name := splitPrefix(hashUri)
+	assert.Equal(t, testUri+"#", base)
+	assert.Equal(t, "me", name)
+
+	slashUri := testUri + "/foaf"
+	base, name = splitPrefix(slashUri)
+	assert.Equal(t, testUri+"/", base)
+	assert.Equal(t, "foaf", name)
+
+	badUri := "test"
+	base, name = splitPrefix(badUri)
+	assert.Equal(t, "", base)
+	assert.Equal(t, badUri, name)
+
 }
 
 func TestRDFBrack(t *testing.T) {

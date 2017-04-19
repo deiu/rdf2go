@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	rdf "github.com/deiu/gon3"
@@ -75,66 +74,6 @@ func (g *Graph) Term() Term {
 // URI returns a Graph URI object
 func (g *Graph) URI() string {
 	return g.uri
-}
-
-func term2rdf(t Term) rdf.Term {
-	switch t := t.(type) {
-	case *BlankNode:
-		id := t.RawValue()
-		node := rdf.NewBlankNode(id)
-		return node
-	case *Resource:
-		node, _ := rdf.NewIRI(t.RawValue())
-		return node
-	case *Literal:
-		if t.Datatype != nil {
-			iri, _ := rdf.NewIRI(t.Datatype.(*Resource).URI)
-			return rdf.NewLiteralWithDataType(t.Value, iri)
-		}
-		if len(t.Language) > 0 {
-			node := rdf.NewLiteralWithLanguage(t.Value, t.Language)
-			return node
-		}
-		node := rdf.NewLiteral(t.Value)
-		return node
-	}
-	return nil
-}
-
-func rdf2term(term rdf.Term) Term {
-	switch term := term.(type) {
-	case *rdf.BlankNode:
-		return NewBlankNode(term.RawValue())
-	case *rdf.Literal:
-		if len(term.LanguageTag) > 0 {
-			return NewLiteralWithLanguage(term.LexicalForm, term.LanguageTag)
-		}
-		if term.DatatypeIRI != nil && len(term.DatatypeIRI.String()) > 0 {
-			return NewLiteralWithDatatype(term.LexicalForm, NewResource(debrack(term.DatatypeIRI.String())))
-		}
-		return NewLiteral(term.RawValue())
-	case *rdf.IRI:
-		return NewResource(term.RawValue())
-	}
-	return nil
-}
-
-func jterm2term(term jsonld.Term) Term {
-	switch term := term.(type) {
-	case *jsonld.BlankNode:
-		return NewBlankNode(term.RawValue())
-	case *jsonld.Literal:
-		if len(term.Language) > 0 {
-			return NewLiteralWithLanguage(term.RawValue(), term.Language)
-		}
-		if term.Datatype != nil && len(term.Datatype.String()) > 0 {
-			return NewLiteralWithDatatype(term.Value, NewResource(term.Datatype.RawValue()))
-		}
-		return NewLiteral(term.Value)
-	case *jsonld.Resource:
-		return NewResource(term.RawValue())
-	}
-	return nil
 }
 
 // One returns one triple based on a triple pattern of S, P, O objects
@@ -263,7 +202,7 @@ func (g *Graph) Parse(reader io.Reader, mime string) error {
 		buf.ReadFrom(reader)
 		jsonData, err := jsonld.ReadJSON(buf.Bytes())
 		options := &jsonld.Options{}
-		options.Base = g.URI()
+		options.Base = ""
 		options.ProduceGeneralizedRdf = false
 		dataSet, err := jsonld.ToRDF(jsonData, options)
 		if err != nil {
@@ -371,6 +310,29 @@ func (g *Graph) serializeTurtle(w io.Writer) error {
 	return nil
 }
 
+// func (g *Graph) serializeJSONLD(w io.Writer) error {
+// 	d := jsonld.NewDataset()
+// 	triples := []*jsonld.Triple{}
+
+// 	for triple := range g.IterTriples() {
+// 		jTriple := jsonld.NewTriple(term2jterm(triple.Subject), term2jterm(triple.Predicate), term2jterm(triple.Object))
+// 		triples = append(triples, jTriple)
+// 	}
+
+// 	d.Graphs[g.URI()] = triples
+// 	opts := jsonld.NewOptions(g.URI())
+// 	opts.UseNativeTypes = false
+// 	opts.UseRdfType = true
+// 	serializedJSON := jsonld.FromRDF(d, opts)
+// 	jsonOut, err := json.MarshalIndent(serializedJSON, "", "    ")
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	_, err = fmt.Fprintf(w, "%s", jsonOut)
+// 	return err
+// }
+
 func (g *Graph) serializeJSONLD(w io.Writer) error {
 	r := []map[string]interface{}{}
 	for elt := range g.IterTriples() {
@@ -386,13 +348,11 @@ func (g *Graph) serializeJSONLD(w io.Writer) error {
 			}
 			break
 		case *Literal:
-			//@@@@
-			log.Printf("%+v\n", t)
 			v := map[string]string{
 				"@value": t.Value,
 			}
 			if t.Datatype != nil && len(t.Datatype.String()) > 0 {
-				v["@type"] = t.Datatype.String()
+				v["@type"] = debrack(t.Datatype.String())
 			}
 			if len(t.Language) > 0 {
 				v["@language"] = t.Language

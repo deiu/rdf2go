@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	jsonld "github.com/linkeddata/gojsonld"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,14 +42,6 @@ func TestNewGraph(t *testing.T) {
 	assert.Equal(t, NewResource(testUri), g.Term())
 }
 
-// func TestNewGraphError(t *testing.T) {
-// 	_, err := NewGraph("ssh://test.org")
-// 	assert.NotNil(t, err)
-
-// 	_, err = NewGraph("a")
-// 	assert.NotNil(t, err)
-// }
-
 func TestGraphString(t *testing.T) {
 	triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
 	g, err := NewGraph(testUri)
@@ -72,29 +63,27 @@ func TestGraphAdd(t *testing.T) {
 func TestGraphResourceTerms(t *testing.T) {
 	t1 := NewResource(testUri)
 	assert.True(t, t1.Equal(rdf2term(term2rdf(t1))))
-
-	t2 := NewResource(testUri)
-	assert.True(t, t2.Equal(jterm2term(jsonld.NewResource(testUri))))
+	assert.True(t, t1.Equal(jterm2term(term2jterm(t1))))
 }
 
 func TestGraphLiteralTerms(t *testing.T) {
 	t1 := NewLiteralWithDatatype("value", NewResource(testUri))
 	assert.True(t, t1.Equal(rdf2term(term2rdf(t1))))
-	assert.True(t, t1.Equal(jterm2term(jsonld.NewLiteralWithDatatype("value", jsonld.NewResource(testUri)))))
+	assert.True(t, t1.Equal(jterm2term(term2jterm(t1))))
 
 	t2 := NewLiteralWithLanguage("value", "en")
 	assert.True(t, t2.Equal(rdf2term(term2rdf(t2))))
-	assert.True(t, t2.Equal(jterm2term(jsonld.NewLiteralWithLanguage("value", "en"))))
+	assert.True(t, t2.Equal(jterm2term(term2jterm(t2))))
 
 	t3 := NewLiteral("value")
 	assert.True(t, t3.Equal(rdf2term(term2rdf(t3))))
-	assert.True(t, t3.Equal(jterm2term(jsonld.NewLiteral("value"))))
+	assert.True(t, t3.Equal(jterm2term(term2jterm(t3))))
 }
 
 func TestGraphBlankNodeTerms(t *testing.T) {
 	t1 := NewBlankNode("n1")
 	assert.True(t, t1.Equal(rdf2term(term2rdf(t1))))
-	assert.True(t, t1.Equal(jterm2term(jsonld.NewBlankNode("n1"))))
+	assert.True(t, t1.Equal(jterm2term(term2jterm(t1))))
 }
 
 func TestGraphOne(t *testing.T) {
@@ -204,21 +193,12 @@ func TestParseJSONLD(t *testing.T) {
 func TestSerializeJSONLD(t *testing.T) {
 	g, err := NewGraph(testUri)
 	assert.NoError(t, err)
+	g.Parse(strings.NewReader(simpleTurtle), "text/turtle")
 
-	triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
-	g.Add(triple)
-	triple = NewTriple(NewResource("a"), NewResource("d"), NewLiteral("e"))
-	g.Add(triple)
-	triple = NewTriple(NewResource("a"), NewResource("d"), NewLiteralWithDatatype("f", NewResource("g")))
-	g.Add(triple)
-	triple = NewTriple(NewResource("a"), NewResource("d"), NewLiteralWithLanguage("h", "en"))
-	g.Add(triple)
-	assert.Equal(t, 4, g.Len())
-
-	// var b bytes.Buffer
-	// g.Serialize(&b, "application/ld+json")
-	// toParse := strings.NewReader(b.String())
-	// g2, err := NewGraph(testUri)
-	// g2.Parse(toParse, "text/turtle")
-	// assert.Equal(t, 2, g2.Len())
+	var b bytes.Buffer
+	g.Serialize(&b, "application/ld+json")
+	toParse := strings.NewReader(b.String())
+	g2, err := NewGraph(testUri)
+	g2.Parse(toParse, "application/ld+json")
+	assert.Equal(t, 2, g2.Len())
 }
