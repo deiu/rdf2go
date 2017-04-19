@@ -50,14 +50,6 @@ func TestTermNewLiteralWithDatatype(t *testing.T) {
 	assert.Equal(t, "\"test\"^^<http://www.w3.org/2001/XMLSchema#string>", s.String())
 }
 
-func TestTermNewLiteralWithLanguageAndDatatype(t *testing.T) {
-	s := NewLiteralWithLanguageAndDatatype("test", "en", NewResource("http://www.w3.org/2001/XMLSchema#string"))
-	assert.Equal(t, "\"test\"@en", s.String())
-
-	s = NewLiteralWithLanguageAndDatatype("test", "", NewResource("http://www.w3.org/2001/XMLSchema#string"))
-	assert.Equal(t, "\"test\"^^<http://www.w3.org/2001/XMLSchema#string>", s.String())
-}
-
 func TestTermNewBlankNode(t *testing.T) {
 	id := NewBlankNode("n1")
 	assert.Equal(t, "_:n1", id.String())
@@ -80,6 +72,13 @@ func TestTermBNodeEqual(t *testing.T) {
 func TestTermNils(t *testing.T) {
 	t1 := Term(&fakeTerm{URI: "test"})
 	assert.Nil(t, term2rdf(t1))
+}
+
+func TestAtLang(t *testing.T) {
+	assert.Equal(t, "@en", atLang("en"))
+	assert.Equal(t, "@en", atLang("@en"))
+	assert.Equal(t, "@e", atLang("e"))
+	assert.Equal(t, "", atLang(""))
 }
 
 func TestRDFBrack(t *testing.T) {

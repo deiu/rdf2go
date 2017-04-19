@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	rdf "github.com/deiu/gon3"
@@ -46,15 +47,19 @@ type Graph struct {
 
 // NewGraph creates a Graph object
 func NewGraph(uri string) (*Graph, error) {
-	if uri[:5] != "http:" && uri[:6] != "https:" {
-		return &Graph{}, errors.New("Non http graphs are not allowed")
-	}
-	return &Graph{
+	// if len(uri) < 5 {
+	// 	return &Graph{}, errors.New("The URI provided is too short")
+	// }
+	// if uri[:5] != "http:" && uri[:6] != "https:" {
+	// 	return &Graph{}, errors.New("Non http graphs are not allowed")
+	// }
+	g := &Graph{
 		triples: make(map[*Triple]bool),
 
 		uri:  uri,
 		term: NewResource(uri),
-	}, nil
+	}
+	return g, nil
 }
 
 // Len returns the length of the graph as number of triples in the graph
@@ -105,7 +110,7 @@ func rdf2term(term rdf.Term) Term {
 			return NewLiteralWithLanguage(term.LexicalForm, term.LanguageTag)
 		}
 		if term.DatatypeIRI != nil && len(term.DatatypeIRI.String()) > 0 {
-			return NewLiteralWithLanguageAndDatatype(term.LexicalForm, term.LanguageTag, NewResource(debrack(term.DatatypeIRI.String())))
+			return NewLiteralWithDatatype(term.LexicalForm, NewResource(debrack(term.DatatypeIRI.String())))
 		}
 		return NewLiteral(term.RawValue())
 	case *rdf.IRI:
@@ -119,8 +124,11 @@ func jterm2term(term jsonld.Term) Term {
 	case *jsonld.BlankNode:
 		return NewBlankNode(term.RawValue())
 	case *jsonld.Literal:
+		if len(term.Language) > 0 {
+			return NewLiteralWithLanguage(term.RawValue(), term.Language)
+		}
 		if term.Datatype != nil && len(term.Datatype.String()) > 0 {
-			return NewLiteralWithLanguageAndDatatype(term.Value, term.Language, NewResource(term.Datatype.RawValue()))
+			return NewLiteralWithDatatype(term.Value, NewResource(term.Datatype.RawValue()))
 		}
 		return NewLiteral(term.Value)
 	case *jsonld.Resource:
@@ -280,11 +288,11 @@ func (g *Graph) Parse(reader io.Reader, mime string) error {
 }
 
 // LoadURI is used to load RDF data from a specific URI
-func (g *Graph) LoadURI(uri string) (err error) {
+func (g *Graph) LoadURI(uri string) error {
 	doc := defrag(uri)
 	q, err := http.NewRequest("GET", doc, nil)
 	if err != nil {
-		return
+		return err
 	}
 	if len(g.uri) == 0 {
 		g.uri = doc
@@ -292,37 +300,33 @@ func (g *Graph) LoadURI(uri string) (err error) {
 	q.Header.Set("Accept", "text/turtle;q=1,application/ld+json;q=0.5")
 	r, err := httpClient.Do(q)
 	if err != nil {
-		return
+		return err
 	}
 	if r != nil {
 		defer r.Body.Close()
 		if r.StatusCode == 200 {
 			g.Parse(r.Body, r.Header.Get("Content-Type"))
 		} else {
-			err = fmt.Errorf("Could not fetch graph from %s - HTTP %d", uri, r.StatusCode)
+			return fmt.Errorf("Could not fetch graph from %s - HTTP %d", uri, r.StatusCode)
 		}
 	}
-	return
+	return nil
 }
 
-// String is used to serialize a graph based on a given mime type and return a string
-func (g *Graph) String(mime string) (string, error) {
-	serializerName := mimeSerializer[mime]
-	var w bytes.Buffer
-	if serializerName == "jsonld" {
-		err := g.serializeJSONLd(&w)
-		return w.String(), err
+// String is used to serialize the graph object using NTriples
+func (g *Graph) String() string {
+	var toString string
+	for triple := range g.IterTriples() {
+		toString += triple.String() + "\n"
 	}
-	// just return Turtle by default
-	err := g.serializeTurtle(&w)
-	return w.String(), err
+	return toString
 }
 
 // Serialize is used to serialize a graph based on a given mime type
 func (g *Graph) Serialize(w io.Writer, mime string) error {
 	serializerName := mimeSerializer[mime]
 	if serializerName == "jsonld" {
-		return g.serializeJSONLd(w)
+		return g.serializeJSONLD(w)
 	}
 	// just return Turtle by default
 	return g.serializeTurtle(w)
@@ -367,7 +371,7 @@ func (g *Graph) serializeTurtle(w io.Writer) error {
 	return nil
 }
 
-func (g *Graph) serializeJSONLd(w io.Writer) error {
+func (g *Graph) serializeJSONLD(w io.Writer) error {
 	r := []map[string]interface{}{}
 	for elt := range g.IterTriples() {
 		one := map[string]interface{}{
@@ -382,6 +386,8 @@ func (g *Graph) serializeJSONLd(w io.Writer) error {
 			}
 			break
 		case *Literal:
+			//@@@@
+			log.Printf("%+v\n", t)
 			v := map[string]string{
 				"@value": t.Value,
 			}
@@ -395,7 +401,7 @@ func (g *Graph) serializeJSONLd(w io.Writer) error {
 		}
 		r = append(r, one)
 	}
-	bytes, err := json.Marshal(r[0])
+	bytes, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}

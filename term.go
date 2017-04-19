@@ -86,14 +86,6 @@ func NewLiteralWithDatatype(value string, datatype Term) (term Term) {
 	return Term(&Literal{Value: value, Datatype: datatype})
 }
 
-// NewLiteralWithLanguageAndDatatype returns a new literal with the given value, language
-// and datatype. Technically a literal cannot have both a language and a datatype, but this function
-// is provided to allow creation of literal in a context where this check has already been made,
-// such as in a parser.
-func NewLiteralWithLanguageAndDatatype(value string, language string, datatype Term) (term Term) {
-	return Term(&Literal{Value: value, Language: language, Datatype: datatype})
-}
-
 // String returns the NTriples representation of this literal.
 func (term Literal) String() (str string) {
 	str = term.Value
@@ -105,9 +97,10 @@ func (term Literal) String() (str string) {
 
 	str = fmt.Sprintf("\"%s\"", str)
 
-	if term.Language != "" {
-		str += "@" + term.Language
-	} else if term.Datatype != nil {
+	// if term.Language != "" {
+	str += atLang(term.Language)
+	// } else
+	if term.Datatype != nil {
 		str += "^^" + term.Datatype.String()
 	}
 
@@ -183,6 +176,16 @@ func encodeTerm(iterm Term) string {
 		return term.String()
 	}
 
+	return ""
+}
+
+func atLang(lang string) string {
+	if len(lang) > 0 {
+		if strings.HasPrefix(lang, "@") {
+			return lang
+		}
+		return "@" + lang
+	}
 	return ""
 }
 
