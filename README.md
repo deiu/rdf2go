@@ -53,10 +53,18 @@ g, _ := NewGraph("https://example.org")
 g.Add(NewTriple(NewResource("a"), NewResource("b"), NewResource("c")))
 
 // Look up one triple matching the given subject
-triple := g.One(nil, nil, NewResource("c")) // -> <a> <b> <c> .
+triple = g.One(NewResource("a"), nil, nil) // -> <a> <b> <c> .
 
+// Look up one triple matching the given predicate
 triple = g.One(nil, NewResource("b"), nil) // -> <a> <b> <c> .
 
+// Look up one triple matching the given object
+triple := g.One(nil, nil, NewResource("c")) // -> <a> <b> <c> .
+
+// Look up one triple matching the given subject and predicate
+triple = g.One(NewResource("a"), NewResource("b"), nil) // -> <a> <b> <c> .
+
+// Look up one triple matching the a bad predicate
 triple = g.One(nil, NewResource("z"), nil) // -> nil
 ```
 
