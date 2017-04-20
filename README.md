@@ -1,5 +1,5 @@
 # rdf2go
-Native golang parser/serializer from/to Turtle and JSONLD.
+Native golang parser/serializer from/to Turtle and JSON-LD.
 
 # Installation
 
@@ -21,20 +21,27 @@ if err != nil {
 	// deal with err
 }
 
-// Add a new triple to the graph
-triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
-g.Add(triple)
+// Add a few triples to the graph
+triple1 := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
+g.Add(triple1)
+triple2 := NewTriple(NewResource("a"), NewResource("d"), NewResource("e"))
+g.Add(triple2)
 
 // Get length of Graph (nr of triples)
-g.Len()
+g.Len() // -> 2
 
-// Delete the triple
-g.Remove(triple)
+// Dump graph contents to NTriples
+out := g.String()
+// <a> <b> <c> .
+// <a> <d> <e> .
+
+// Delete a triple
+g.Remove(triple2)
 ```
 
 ## Looking up triples from the graph
 
-### Looking up a single triple
+### Looking up triples and returning a single match
 
 The `g.One()` method returns the first triple that matches against any (or all) of Subject, Predicate, Object patterns.
 
@@ -46,11 +53,9 @@ g, _ := NewGraph("https://example.org")
 g.Add(NewTriple(NewResource("a"), NewResource("b"), NewResource("c")))
 
 // Look up one triple matching the given subject
-triple := g.One(nil, nil, NewResource("c"))
-triple.String() // -> <a> <b> <c> .
+triple := g.One(nil, nil, NewResource("c")) // -> <a> <b> <c> .
 
-triple = g.One(nil, NewResource("b"), nil)
-triple.String() // -> <a> <b> <c> .
+triple = g.One(nil, NewResource("b"), nil) // -> <a> <b> <c> .
 
 triple = g.One(nil, NewResource("z"), nil) // -> nil
 ```
@@ -70,14 +75,16 @@ g.Add(NewTriple(NewResource("a"), NewResource("b"), NewResource("d")))
 // Look up one triple matching the given subject
 triples := g.All(nil, nil, NewResource("c")) //
 for triple := range triples {
-	triple.String() // -> <a> <b> <c> .
-}	
+	triple.String()
+}
+// Returns a single triple that matches object <c>:
+// <a> <b> <c> .
 
 triples = g.All(nil, NewResource("b"), nil)
 for triple := range triples {
 	triple.String()
 }
-// Prints: 
+// Returns all triples that match subject <b>: 
 // <a> <b> <c> .
 // <a> <b> <d> .
 ```
@@ -114,4 +121,103 @@ lit.String() // -> "newTypeVal"^^<https://datatype.com>
 // Create a new Blank Node
 bn := NewBlankNode("a1")
 bn.String() // -> "_:a1"
+```
+
+
+## Parsing data
+
+The parser takes an `io.Reader` as first parameter, and the string containing the mime type as the second parameter.
+
+Currently, the supported parsing formats are Turtle (with mime type `text/turtle`) and JSON-LD (with mime type `application/ld+json`).
+
+### Parsing Turtle from an io.Reader
+
+```
+// Set a base URI
+baseUri := "https://example.org/foo"
+
+// Create a new graph
+g, _ := NewGraph(baseUri)
+
+// r is an io.Reader
+g.Parse(r, "text/turtle")
+```
+
+### Parsing JSON-LD from an io.Reader
+
+```
+// Set a base URI
+baseUri := "https://example.org/foo"
+
+// Create a new graph
+g, _ := NewGraph(baseUri)
+
+// r is an io.Reader
+g.Parse(r, "application/ld+json")
+```
+
+### Parsing either Turtle or JSON-LD from a URI on the Web
+
+In this case you don't have to specify the mime type, as the internal http client will try to content negotiate to either Turtle or JSON-LD. An error will be returned if it fails.
+
+**Note:** The `NewGraph()` function accepts an optional parameter called `skipVerify` that is used to tell the internal http client whether or not to ignore bad/self-signed server side certificates. By default, it will not check if you omit this parameter, or if you set it to `true`.
+
+```
+// Set a base URI
+uri := "https://example.org/foo"
+
+// Force check of remote server certificate to see if it's valid 
+// (don't skip verification)
+skipVerify := false
+
+// Create a new graph. You can also omit the skipVerify parameter
+// and accept invalid certificates (e.g. self-signed)
+g, _ := NewGraph(uri, skipVerify)
+
+
+err := g.LoadURI(uri)
+if err != nil {
+	// deal with the error
+}
+```
+
+
+## Serializing data
+
+
+The serializer takes an `io.Writer` as first parameter, and the string containing the mime type as the second parameter.
+
+Currently, the supported serialization formats are Turtle (with mime type `text/turtle`) and JSON-LD (with mime type `application/ld+json`).
+
+
+### Serializing to Turtle
+
+```
+// Set a base URI
+baseUri := "https://example.org/foo"
+
+// Create a new graph
+g, _ := NewGraph(baseUri)
+
+triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
+g.Add(triple)
+
+// w is an io.Writer
+g.Serialize(w, "text/turtle")
+```
+
+### Serializing to JSON-LD
+
+```
+// Set a base URI
+baseUri := "https://example.org/foo"
+
+// Create a new graph
+g, _ := NewGraph(baseUri)
+
+triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
+g.Add(triple)
+
+// w is an io.Writer
+g.Serialize(w, "application/ld+json")
 ```
