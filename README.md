@@ -1,4 +1,7 @@
 # rdf2go
+
+[![Build Status](https://api.travis-ci.org/deiu/rdf2go.svg?branch=master)](https://travis-ci.org/deiu/rdf2go)
+
 Native golang parser/serializer from/to Turtle and JSON-LD.
 
 # Installation
