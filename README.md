@@ -41,7 +41,7 @@ g.Remove(triple2)
 
 ## Looking up triples from the graph
 
-### Looking up triples and returning a single match
+### Returning a single match
 
 The `g.One()` method returns the first triple that matches against any (or all) of Subject, Predicate, Object patterns.
 
@@ -60,7 +60,7 @@ triple = g.One(nil, NewResource("b"), nil) // -> <a> <b> <c> .
 triple = g.One(nil, NewResource("z"), nil) // -> nil
 ```
 
-### Looking up triples and returning a list of matches
+### Returning a list of matches
 
 Similar to `g.One()`, `g.All()` returns all triples that match the given pattern.
 
