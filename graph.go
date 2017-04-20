@@ -13,50 +13,37 @@ import (
 	jsonld "github.com/linkeddata/gojsonld"
 )
 
-// AnyGraph defines methods common to Graph types
-// type AnyGraph interface {
-// 	Len() int
-// 	URI() string
-// 	Parse(io.Reader, string)
-// 	Serialize(string) (string, error)
+// Graph structure
+type Graph struct {
+	triples    map[*Triple]bool
+	httpClient *http.Client
+	uri        string
+	term       Term
+}
 
-// 	IterTriples() chan *Triple
-
-// 	ReadFile(string)
-// 	WriteFile(*os.File, string) error
-// }
-
-var (
-	httpClient = &http.Client{
+// NewHttpClient creates an http.Client to be used for parsing resources
+// directly from the Web
+func NewHttpClient(skip bool) *http.Client {
+	return &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: skip,
 			},
 		},
 	}
-)
-
-// Graph structure
-type Graph struct {
-	triples map[*Triple]bool
-
-	uri  string
-	term Term
 }
 
 // NewGraph creates a Graph object
-func NewGraph(uri string) (*Graph, error) {
-	// if len(uri) < 5 {
-	// 	return &Graph{}, errors.New("The URI provided is too short")
-	// }
-	// if uri[:5] != "http:" && uri[:6] != "https:" {
-	// 	return &Graph{}, errors.New("Non http graphs are not allowed")
-	// }
+func NewGraph(uri string, skipVerify ...bool) (*Graph, error) {
+	skip := false
+	if len(skipVerify) > 0 {
+		skip = skipVerify[0]
+	}
 	g := &Graph{
-		triples: make(map[*Triple]bool),
-
-		uri:  uri,
-		term: NewResource(uri),
+		triples:    make(map[*Triple]bool),
+		httpClient: NewHttpClient(skip),
+		uri:        uri,
+		term:       NewResource(uri),
 	}
 	return g, nil
 }
@@ -182,15 +169,6 @@ func (g *Graph) All(s Term, p Term, o Term) []*Triple {
 	return triples
 }
 
-// AddStatement adds a Statement object
-// func (g *Graph) AddStatement(st *crdf.Statement) {
-// 	s, p, o := term2term(st.Subject), term2term(st.Predicate), term2term(st.Object)
-// 	for range g.All(s, p, o) {
-// 		return
-// 	}
-// 	g.AddTriple(s, p, o)
-// }
-
 // Parse is used to parse RDF data from a reader, using the provided mime type
 func (g *Graph) Parse(reader io.Reader, mime string) error {
 	parserName := mimeParser[mime]
@@ -237,7 +215,7 @@ func (g *Graph) LoadURI(uri string) error {
 		g.uri = doc
 	}
 	q.Header.Set("Accept", "text/turtle;q=1,application/ld+json;q=0.5")
-	r, err := httpClient.Do(q)
+	r, err := g.httpClient.Do(q)
 	if err != nil {
 		return err
 	}
@@ -368,30 +346,3 @@ func (g *Graph) serializeJSONLD(w io.Writer) error {
 	fmt.Fprintf(w, string(bytes))
 	return nil
 }
-
-// WriteFile is used to dump RDF from a Graph into a file
-// func (g *Graph) WriteFile(file *os.File, mime string) error {
-// 	serializerName := mimeSerializer[mime]
-// 	if len(serializerName) == 0 {
-// 		serializerName = "turtle"
-// 	}
-// 	serializer := crdf.NewSerializer(serializerName)
-// 	defer serializer.Free()
-// 	err := serializer.SetFile(file, g.uri)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	ch := make(chan *crdf.Statement, 1024)
-// 	go func() {
-// 		for triple := range g.IterTriples() {
-// 			ch <- &crdf.Statement{
-// 				Subject:   term2C(triple.Subject),
-// 				Predicate: term2C(triple.Predicate),
-// 				Object:    term2C(triple.Object),
-// 			}
-// 		}
-// 		close(ch)
-// 	}()
-// 	serializer.AddN(ch)
-// 	return nil
-// }

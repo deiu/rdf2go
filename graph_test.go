@@ -146,6 +146,15 @@ func TestGraphLoadURIFail(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestGraphLoadURINoSkip(t *testing.T) {
+	uri := testServer.URL + "/foo#me"
+	g, err := NewGraph(uri, false)
+	assert.NoError(t, err)
+	err = g.LoadURI(uri)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, g.Len())
+}
+
 func TestParseFail(t *testing.T) {
 	g, err := NewGraph(testUri)
 	assert.NoError(t, err)
