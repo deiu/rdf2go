@@ -1,6 +1,7 @@
 # rdf2go
 
 [![Build Status](https://api.travis-ci.org/deiu/rdf2go.svg?branch=master)](https://travis-ci.org/deiu/rdf2go)
+[![Coverage Status](https://coveralls.io/repos/github/deiu/rdf2go/badge.svg?branch=master)](https://coveralls.io/github/deiu/rdf2go?branch=master)
 
 Native golang parser/serializer from/to Turtle and JSON-LD.
 
