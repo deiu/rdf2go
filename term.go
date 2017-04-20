@@ -22,6 +22,7 @@ package rdf2go
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 
 	rdf "github.com/deiu/gon3"
@@ -33,6 +34,9 @@ import (
 type Term interface {
 	// Method String should return the NTriples representation of this term.
 	String() string
+
+	// Method RawValue should return the raw value of this term.
+	RawValue() string
 
 	// Method Equal should return whether this term is equal to another.
 	Equal(Term) bool
@@ -90,8 +94,8 @@ func NewLiteralWithDatatype(value string, datatype Term) (term Term) {
 }
 
 // String returns the NTriples representation of this literal.
-func (term Literal) String() (str string) {
-	str = term.Value
+func (term Literal) String() string {
+	str := term.Value
 	str = strings.Replace(str, "\\", "\\\\", -1)
 	str = strings.Replace(str, "\"", "\\\"", -1)
 	str = strings.Replace(str, "\n", "\\n", -1)
@@ -108,6 +112,10 @@ func (term Literal) String() (str string) {
 	}
 
 	return str
+}
+
+func (term Literal) RawValue() string {
+	return term.Value
 }
 
 // Equal returns whether this literal is equivalent to another.
@@ -138,26 +146,26 @@ func (term Literal) Equal(other Term) bool {
 
 // BlankNode is an RDF blank node i.e. an unqualified URI/IRI.
 type BlankNode struct {
-	ID string
+	ID int
 }
 
 // NewBlankNode returns a new blank node with the given ID.
-func NewBlankNode(id string) (term Term) {
+func NewBlankNode(id int) (term Term) {
 	return Term(&BlankNode{ID: id})
 }
 
 // NewAnonNode returns a new blank node with a pseudo-randomly generated ID.
 func NewAnonNode() (term Term) {
-	return Term(&BlankNode{ID: fmt.Sprintf("anon%016x", rand.Int63())})
+	return Term(&BlankNode{ID: rand.Int()})
 }
 
 // String returns the NTriples representation of the blank node.
-func (term BlankNode) String() (str string) {
-	return "_:" + term.ID
+func (term BlankNode) String() string {
+	return "_:" + fmt.Sprintf("%d", term.ID)
 }
 
-func (term BlankNode) RawValue() (str string) {
-	return term.ID
+func (term BlankNode) RawValue() string {
+	return fmt.Sprintf("%d", term.ID)
 }
 
 // Equal returns whether this blank node is equivalent to another.
@@ -196,7 +204,8 @@ func term2rdf(t Term) rdf.Term {
 func rdf2term(term rdf.Term) Term {
 	switch term := term.(type) {
 	case *rdf.BlankNode:
-		return NewBlankNode(term.RawValue())
+		id, _ := strconv.Atoi(term.RawValue())
+		return NewBlankNode(id)
 	case *rdf.Literal:
 		if len(term.LanguageTag) > 0 {
 			return NewLiteralWithLanguage(term.LexicalForm, term.LanguageTag)
@@ -214,7 +223,8 @@ func rdf2term(term rdf.Term) Term {
 func jterm2term(term jsonld.Term) Term {
 	switch term := term.(type) {
 	case *jsonld.BlankNode:
-		return NewBlankNode(term.RawValue())
+		id, _ := strconv.Atoi(term.RawValue())
+		return NewBlankNode(id)
 	case *jsonld.Literal:
 		if len(term.Language) > 0 {
 			return NewLiteralWithLanguage(term.RawValue(), term.Language)

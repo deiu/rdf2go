@@ -2,7 +2,6 @@ package rdf2go
 
 import (
 	"github.com/stretchr/testify/assert"
-	"strings"
 	"testing"
 )
 
@@ -18,10 +17,21 @@ func (tt *fakeTerm) String() string {
 	return ""
 }
 
+func (tt *fakeTerm) RawValue() string {
+	return ""
+}
+
 func TestTermResourceEqual(t *testing.T) {
 	t1 := NewResource(testUri)
 	assert.True(t, t1.Equal(NewResource(testUri)))
 	assert.False(t, t1.Equal(NewLiteral("test1")))
+}
+
+func TestTermLiteral(t *testing.T) {
+	str := "value"
+	t1 := NewLiteral(str)
+	assert.Equal(t, "\""+str+"\"", t1.String())
+	assert.Equal(t, str, t1.RawValue())
 }
 
 func TestTermLiteralEqual(t *testing.T) {
@@ -51,20 +61,21 @@ func TestTermNewLiteralWithDatatype(t *testing.T) {
 }
 
 func TestTermNewBlankNode(t *testing.T) {
-	id := NewBlankNode("n1")
-	assert.Equal(t, "_:n1", id.String())
+	id := NewBlankNode(1)
+	assert.Equal(t, "_:1", id.String())
+	assert.Equal(t, "1", id.RawValue())
 }
 
 func TestTermNewAnonNode(t *testing.T) {
 	id := NewAnonNode()
-	assert.True(t, strings.Contains(id.String(), "_:anon"))
+	assert.True(t, len(id.String()) > 1)
 }
 
 func TestTermBNodeEqual(t *testing.T) {
-	id1 := NewBlankNode("n1")
-	id2 := NewBlankNode("n1")
+	id1 := NewBlankNode(1)
+	id2 := NewBlankNode(1)
 	assert.True(t, id1.Equal(id2))
-	id3 := NewBlankNode("n2")
+	id3 := NewBlankNode(2)
 	assert.False(t, id1.Equal(id3))
 	assert.False(t, id1.Equal(NewResource(testUri)))
 }
@@ -85,7 +96,7 @@ func TestAtLang(t *testing.T) {
 func TestEncodeTerm(t *testing.T) {
 	iterm := NewResource(testUri)
 	assert.Equal(t, iterm.String(), encodeTerm(iterm))
-	iterm = NewBlankNode("1")
+	iterm = NewBlankNode(1)
 	assert.Equal(t, iterm.String(), encodeTerm(iterm))
 	iterm = NewLiteral("value")
 	assert.Equal(t, iterm.String(), encodeTerm(iterm))

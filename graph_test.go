@@ -81,7 +81,7 @@ func TestGraphLiteralTerms(t *testing.T) {
 }
 
 func TestGraphBlankNodeTerms(t *testing.T) {
-	t1 := NewBlankNode("n1")
+	t1 := NewBlankNode(1)
 	assert.True(t, t1.Equal(rdf2term(term2rdf(t1))))
 	assert.True(t, t1.Equal(jterm2term(term2jterm(t1))))
 }
@@ -203,11 +203,13 @@ func TestSerializeJSONLD(t *testing.T) {
 	g, err := NewGraph(testUri)
 	assert.NoError(t, err)
 	g.Parse(strings.NewReader(simpleTurtle), "text/turtle")
+	g.Add(NewTriple(NewResource(testUri+"#me"), NewResource("http://xmlns.com/foaf/0.1/nick"), NewLiteralWithLanguage("test", "en")))
+	assert.Equal(t, 3, g.Len())
 
 	var b bytes.Buffer
 	g.Serialize(&b, "application/ld+json")
 	toParse := strings.NewReader(b.String())
 	g2, err := NewGraph(testUri)
 	g2.Parse(toParse, "application/ld+json")
-	assert.Equal(t, 2, g2.Len())
+	assert.Equal(t, 3, g2.Len())
 }
