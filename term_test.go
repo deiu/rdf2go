@@ -62,13 +62,14 @@ func TestTermNewLiteralWithDatatype(t *testing.T) {
 
 func TestTermNewBlankNode(t *testing.T) {
 	id := NewBlankNode(1)
-	assert.Equal(t, "_:1", id.String())
+	assert.Equal(t, "_:n1", id.String())
 	assert.Equal(t, "1", id.RawValue())
 }
 
 func TestTermNewAnonNode(t *testing.T) {
 	id := NewAnonNode()
-	assert.True(t, len(id.String()) > 1)
+	assert.True(t, len(id.String()) > 3)
+	assert.True(t, id.String()[:3] == "_:n")
 }
 
 func TestTermBNodeEqual(t *testing.T) {

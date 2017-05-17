@@ -161,7 +161,7 @@ func NewAnonNode() (term Term) {
 
 // String returns the NTriples representation of the blank node.
 func (term BlankNode) String() string {
-	return "_:" + fmt.Sprintf("%d", term.ID)
+	return "_:n" + fmt.Sprintf("%d", term.ID)
 }
 
 func (term BlankNode) RawValue() string {
