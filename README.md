@@ -130,9 +130,13 @@ lit.String() // -> "newTypeVal"^^<https://datatype.com>
 ### Blank Nodes
 
 ```golang
-// Create a new Blank Node
-bn := NewBlankNode("a1")
-bn.String() // -> "_:a1"
+// Create a new Blank Node with a given ID
+bn := NewBlankNode(9)
+bn.String() // -> "_:n9"
+
+// Create an anonymous Blank Node with a random ID
+abn := NewAnonNode()
+abn.String() // -> "_:n192853"
 ```
 
 
@@ -151,7 +155,7 @@ baseUri := "https://example.org/foo"
 // Create a new graph
 g, _ := NewGraph(baseUri)
 
-// r is an io.Reader
+// r is of type io.Reader
 g.Parse(r, "text/turtle")
 ```
 
@@ -178,14 +182,13 @@ In this case you don't have to specify the mime type, as the internal http clien
 // Set a base URI
 uri := "https://example.org/foo"
 
-// Force check of remote server certificate to see if it's valid 
+// Check remote server certificate to see if it's valid 
 // (don't skip verification)
 skipVerify := false
 
 // Create a new graph. You can also omit the skipVerify parameter
 // and accept invalid certificates (e.g. self-signed)
 g, _ := NewGraph(uri, skipVerify)
-
 
 err := g.LoadURI(uri)
 if err != nil {
@@ -214,7 +217,7 @@ g, _ := NewGraph(baseUri)
 triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
 g.Add(triple)
 
-// w is an io.Writer
+// w is of type io.Writer
 g.Serialize(w, "text/turtle")
 ```
 
@@ -230,6 +233,6 @@ g, _ := NewGraph(baseUri)
 triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
 g.Add(triple)
 
-// w is an io.Writer
+// w is of type io.Writer
 g.Serialize(w, "application/ld+json")
 ```
