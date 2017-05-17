@@ -15,7 +15,7 @@ Just go get it!
 
 ## Working with graphs
 
-```
+```golang
 // Set a base URI
 baseUri := "https://example.org/foo"
 
@@ -49,7 +49,7 @@ g.Remove(triple2)
 
 The `g.One()` method returns the first triple that matches against any (or all) of Subject, Predicate, Object patterns.
 
-```
+```golang
 // Create a new graph
 g, _ := NewGraph("https://example.org")
 
@@ -76,7 +76,7 @@ triple = g.One(nil, NewResource("z"), nil) // -> nil
 
 Similar to `g.One()`, `g.All()` returns all triples that match the given pattern.
 
-```
+```golang
 // Create a new graph
 g, _ := NewGraph("https://example.org")
 
@@ -105,7 +105,7 @@ for triple := range triples {
 
 ### IRIs
 
-```
+```golang
 // Create a new IRI
 iri := NewResource("https://example.org")
 iri.String() // -> <https://example.org>
@@ -113,7 +113,7 @@ iri.String() // -> <https://example.org>
 
 ### Literals
 
-```
+```golang
 // Create a new simple Literal
 lit := NewLiteral("hello world")
 lit.String() // -> "hello word"
@@ -129,7 +129,7 @@ lit.String() // -> "newTypeVal"^^<https://datatype.com>
 
 ### Blank Nodes
 
-```
+```golang
 // Create a new Blank Node
 bn := NewBlankNode("a1")
 bn.String() // -> "_:a1"
@@ -144,7 +144,7 @@ Currently, the supported parsing formats are Turtle (with mime type `text/turtle
 
 ### Parsing Turtle from an io.Reader
 
-```
+```golang
 // Set a base URI
 baseUri := "https://example.org/foo"
 
@@ -157,7 +157,7 @@ g.Parse(r, "text/turtle")
 
 ### Parsing JSON-LD from an io.Reader
 
-```
+```golang
 // Set a base URI
 baseUri := "https://example.org/foo"
 
@@ -174,7 +174,7 @@ In this case you don't have to specify the mime type, as the internal http clien
 
 **Note:** The `NewGraph()` function accepts an optional parameter called `skipVerify` that is used to tell the internal http client whether or not to ignore bad/self-signed server side certificates. By default, it will not check if you omit this parameter, or if you set it to `true`.
 
-```
+```golang
 // Set a base URI
 uri := "https://example.org/foo"
 
@@ -204,7 +204,7 @@ Currently, the supported serialization formats are Turtle (with mime type `text/
 
 ### Serializing to Turtle
 
-```
+```golang
 // Set a base URI
 baseUri := "https://example.org/foo"
 
@@ -220,7 +220,7 @@ g.Serialize(w, "text/turtle")
 
 ### Serializing to JSON-LD
 
-```
+```golang
 // Set a base URI
 baseUri := "https://example.org/foo"
 
