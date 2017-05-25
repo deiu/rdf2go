@@ -157,6 +157,8 @@ func TestParseTurtle(t *testing.T) {
 	g := NewGraph(testUri)
 	g.Parse(strings.NewReader(simpleTurtle), "text/turtle")
 	assert.Equal(t, 2, g.Len())
+	assert.NotNil(t, g.One(NewResource(testUri+"#me"), NewResource("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), NewResource("http://xmlns.com/foaf/0.1/Person")))
+	assert.NotNil(t, g.One(NewResource(testUri+"#me"), NewResource("http://xmlns.com/foaf/0.1/name"), NewLiteral("Test")))
 }
 
 func TestSerializeTurtle(t *testing.T) {
