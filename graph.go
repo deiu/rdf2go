@@ -34,7 +34,7 @@ func NewHttpClient(skip bool) *http.Client {
 }
 
 // NewGraph creates a Graph object
-func NewGraph(uri string, skipVerify ...bool) (*Graph, error) {
+func NewGraph(uri string, skipVerify ...bool) *Graph {
 	skip := false
 	if len(skipVerify) > 0 {
 		skip = skipVerify[0]
@@ -45,7 +45,7 @@ func NewGraph(uri string, skipVerify ...bool) (*Graph, error) {
 		uri:        uri,
 		term:       NewResource(uri),
 	}
-	return g, nil
+	return g
 }
 
 // Len returns the length of the graph as number of triples in the graph

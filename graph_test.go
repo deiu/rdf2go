@@ -35,8 +35,7 @@ func MockServer() http.Handler {
 }
 
 func TestNewGraph(t *testing.T) {
-	g, err := NewGraph(testUri)
-	assert.Nil(t, err)
+	g := NewGraph(testUri)
 	assert.Equal(t, testUri, g.URI())
 	assert.Equal(t, 0, g.Len())
 	assert.Equal(t, NewResource(testUri), g.Term())
@@ -44,16 +43,14 @@ func TestNewGraph(t *testing.T) {
 
 func TestGraphString(t *testing.T) {
 	triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
-	g, err := NewGraph(testUri)
-	assert.Nil(t, err)
+	g := NewGraph(testUri)
 	g.Add(triple)
 	assert.Equal(t, "<a> <b> <c> .\n", g.String())
 }
 
 func TestGraphAdd(t *testing.T) {
 	triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
-	g, err := NewGraph(testUri)
-	assert.Nil(t, err)
+	g := NewGraph(testUri)
 	g.Add(triple)
 	assert.Equal(t, 1, g.Len())
 	g.Remove(triple)
@@ -87,8 +84,7 @@ func TestGraphBlankNodeTerms(t *testing.T) {
 }
 
 func TestGraphOne(t *testing.T) {
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 
 	assert.Nil(t, g.One(NewResource("a"), nil, nil))
 
@@ -107,8 +103,7 @@ func TestGraphOne(t *testing.T) {
 }
 
 func TestGraphAll(t *testing.T) {
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 
 	assert.Empty(t, g.All(nil, nil, nil))
 
@@ -130,49 +125,43 @@ func TestGraphAll(t *testing.T) {
 
 func TestGraphLoadURI(t *testing.T) {
 	uri := testServer.URL + "/foo#me"
-	g, err := NewGraph(uri)
-	assert.NoError(t, err)
-	err = g.LoadURI(uri)
+	g := NewGraph(uri)
+	err := g.LoadURI(uri)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, g.Len())
 }
 
 func TestGraphLoadURIFail(t *testing.T) {
 	uri := testServer.URL + "/fail"
-	g, err := NewGraph(uri)
+	g := NewGraph(uri)
 	g.uri = ""
-	assert.NoError(t, err)
-	err = g.LoadURI(uri)
+	err := g.LoadURI(uri)
 	assert.Error(t, err)
 }
 
 func TestGraphLoadURINoSkip(t *testing.T) {
 	uri := testServer.URL + "/foo#me"
-	g, err := NewGraph(uri, false)
-	assert.NoError(t, err)
-	err = g.LoadURI(uri)
+	g := NewGraph(uri, false)
+	err := g.LoadURI(uri)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, g.Len())
 }
 
 func TestParseFail(t *testing.T) {
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 	g.Parse(strings.NewReader(simpleTurtle), "text/plain")
 	assert.Equal(t, 0, g.Len())
 }
 
 func TestParseTurtle(t *testing.T) {
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 	g.Parse(strings.NewReader(simpleTurtle), "text/turtle")
 	assert.Equal(t, 2, g.Len())
 }
 
 func TestSerializeTurtle(t *testing.T) {
 	triple1 := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 	g.Add(triple1)
 
 	b := new(bytes.Buffer)
@@ -185,7 +174,7 @@ func TestSerializeTurtle(t *testing.T) {
 	b = new(bytes.Buffer)
 	g.Serialize(b, "text/turtle")
 	toParse := strings.NewReader(b.String())
-	g2, err := NewGraph(testUri)
+	g2 := NewGraph(testUri)
 	g2.Parse(toParse, "text/turtle")
 	assert.Equal(t, 2, g2.Len())
 }
@@ -193,15 +182,13 @@ func TestSerializeTurtle(t *testing.T) {
 func TestParseJSONLD(t *testing.T) {
 	data := "{ \"@id\": \"http://example.org/#me\", \"http://xmlns.com/foaf/0.1/name\": \"Test\" }"
 	r := strings.NewReader(data)
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 	g.Parse(r, "application/ld+json")
 	assert.Equal(t, 1, g.Len())
 }
 
 func TestSerializeJSONLD(t *testing.T) {
-	g, err := NewGraph(testUri)
-	assert.NoError(t, err)
+	g := NewGraph(testUri)
 	g.Parse(strings.NewReader(simpleTurtle), "text/turtle")
 	g.Add(NewTriple(NewResource(testUri+"#me"), NewResource("http://xmlns.com/foaf/0.1/nick"), NewLiteralWithLanguage("test", "en")))
 	assert.Equal(t, 3, g.Len())
@@ -209,7 +196,7 @@ func TestSerializeJSONLD(t *testing.T) {
 	var b bytes.Buffer
 	g.Serialize(&b, "application/ld+json")
 	toParse := strings.NewReader(b.String())
-	g2, err := NewGraph(testUri)
+	g2 := NewGraph(testUri)
 	g2.Parse(toParse, "application/ld+json")
 	assert.Equal(t, 3, g2.Len())
 }
