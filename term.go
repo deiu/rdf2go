@@ -184,11 +184,11 @@ func term2rdf(t Term) rdf.Term {
 		node := rdf.NewBlankNode(id)
 		return node
 	case *Resource:
-		node, _ := rdf.NewIRI(t.RawValue())
+		node := rdf.NewIRI(t.RawValue())
 		return node
 	case *Literal:
 		if t.Datatype != nil {
-			iri, _ := rdf.NewIRI(t.Datatype.(*Resource).URI)
+			iri := rdf.NewIRI(t.Datatype.(*Resource).URI)
 			return rdf.NewLiteralWithDataType(t.Value, iri)
 		}
 		if len(t.Language) > 0 {

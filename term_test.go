@@ -27,6 +27,12 @@ func TestTermResourceEqual(t *testing.T) {
 	assert.False(t, t1.Equal(NewLiteral("test1")))
 }
 
+func TestTermResourceWithHash(t *testing.T) {
+	rURI := "http://example.com/foo#i"
+	r1 := NewResource(rURI)
+	assert.Equal(t, rURI, r1.RawValue())
+}
+
 func TestTermLiteral(t *testing.T) {
 	str := "value"
 	t1 := NewLiteral(str)

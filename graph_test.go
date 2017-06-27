@@ -88,16 +88,16 @@ func TestGraphOne(t *testing.T) {
 
 	assert.Nil(t, g.One(NewResource("a"), nil, nil))
 
-	triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
+	triple := NewTriple(NewResource("a"), NewResource("foo#b"), NewResource("c"))
 	g.Add(triple)
 
-	assert.True(t, triple.Equal(g.One(NewResource("a"), NewResource("b"), NewResource("c"))))
-	assert.True(t, triple.Equal(g.One(NewResource("a"), NewResource("b"), nil)))
+	assert.True(t, triple.Equal(g.One(NewResource("a"), NewResource("foo#b"), NewResource("c"))))
+	assert.True(t, triple.Equal(g.One(NewResource("a"), NewResource("foo#b"), nil)))
 	assert.True(t, triple.Equal(g.One(NewResource("a"), nil, nil)))
 
-	assert.True(t, triple.Equal(g.One(nil, NewResource("b"), NewResource("c"))))
+	assert.True(t, triple.Equal(g.One(nil, NewResource("foo#b"), NewResource("c"))))
 	assert.True(t, triple.Equal(g.One(nil, nil, NewResource("c"))))
-	assert.True(t, triple.Equal(g.One(nil, NewResource("b"), nil)))
+	assert.True(t, triple.Equal(g.One(nil, NewResource("foo#b"), nil)))
 
 	assert.True(t, triple.Equal(g.One(nil, nil, nil)))
 }
@@ -159,6 +159,12 @@ func TestParseTurtle(t *testing.T) {
 	assert.Equal(t, 2, g.Len())
 	assert.NotNil(t, g.One(NewResource(testUri+"#me"), NewResource("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), NewResource("http://xmlns.com/foaf/0.1/Person")))
 	assert.NotNil(t, g.One(NewResource(testUri+"#me"), NewResource("http://xmlns.com/foaf/0.1/name"), NewLiteral("Test")))
+
+	prefixTurtle := "@prefix test: <http://example.org/test#> .\n<#me> test:foo \"Test\" ."
+	g = NewGraph(testUri)
+	g.Parse(strings.NewReader(prefixTurtle), "text/turtle")
+	assert.Equal(t, 1, g.Len())
+	assert.NotNil(t, g.One(NewResource(testUri+"#me"), NewResource("http://example.org/test#foo"), NewLiteral("Test")))
 }
 
 func TestSerializeTurtle(t *testing.T) {
