@@ -169,6 +169,13 @@ func (g *Graph) All(s Term, p Term, o Term) []*Triple {
 	return triples
 }
 
+// Merge is used to add all the triples form another graph to this one
+func (g *Graph) Merge(toMerge *Graph){
+	for triple := range toMerge.IterTriples(){
+		g.Add(triple)
+	}
+}
+
 // Parse is used to parse RDF data from a reader, using the provided mime type
 func (g *Graph) Parse(reader io.Reader, mime string) error {
 	parserName := mimeParser[mime]
