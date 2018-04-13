@@ -314,8 +314,16 @@ func (g *Graph) serializeTurtle(w io.Writer) error {
 func (g *Graph) serializeJSONLD(w io.Writer) error {
 	r := []map[string]interface{}{}
 	for elt := range g.IterTriples() {
-		one := map[string]interface{}{
-			"@id": elt.Subject.(*Resource).URI,
+		var one map[string]interface{}
+		switch elt.Subject.(type) {
+		case *BlankNode:
+			one = map[string]interface{}{
+				"@id": elt.Subject.(*BlankNode).String(),
+			}
+		default:
+			one = map[string]interface{}{
+				"@id": elt.Subject.(*Resource).URI,
+			}
 		}
 		switch t := elt.Object.(type) {
 		case *Resource:
