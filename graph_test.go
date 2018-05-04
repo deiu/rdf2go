@@ -199,12 +199,13 @@ func TestSerializeJSONLD(t *testing.T) {
 	g := NewGraph(testUri)
 	g.Parse(strings.NewReader(simpleTurtle), "text/turtle")
 	g.Add(NewTriple(NewResource(testUri+"#me"), NewResource("http://xmlns.com/foaf/0.1/nick"), NewLiteralWithLanguage("test", "en")))
-	assert.Equal(t, 3, g.Len())
+	g.Add(NewTriple(NewBlankNode(9), NewResource("http://xmlns.com/foaf/0.1/name"), NewLiteralWithLanguage("test", "en")))
+	assert.Equal(t, 4, g.Len())
 
 	var b bytes.Buffer
 	g.Serialize(&b, "application/ld+json")
 	toParse := strings.NewReader(b.String())
 	g2 := NewGraph(testUri)
 	g2.Parse(toParse, "application/ld+json")
-	assert.Equal(t, 3, g2.Len())
+	assert.Equal(t, 4, g2.Len())
 }
