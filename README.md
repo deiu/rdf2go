@@ -20,10 +20,7 @@ Just go get it!
 baseUri := "https://example.org/foo"
 
 // Create a new graph
-g, err := NewGraph(baseUri)
-if err != nil {
-	// deal with err
-}
+g := (baseUri)
 
 // Add a few triples to the graph
 triple1 := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
@@ -51,7 +48,7 @@ The `g.One()` method returns the first triple that matches against any (or all) 
 
 ```golang
 // Create a new graph
-g, _ := NewGraph("https://example.org")
+g := NewGraph("https://example.org")
 
 // Add a few triples
 g.Add(NewTriple(NewResource("a"), NewResource("b"), NewResource("c")))
@@ -78,7 +75,7 @@ Similar to `g.One()`, `g.All()` returns all triples that match the given pattern
 
 ```golang
 // Create a new graph
-g, _ := NewGraph("https://example.org")
+g := NewGraph("https://example.org")
 
 // Add a few triples
 g.Add(NewTriple(NewResource("a"), NewResource("b"), NewResource("c")))
@@ -86,14 +83,14 @@ g.Add(NewTriple(NewResource("a"), NewResource("b"), NewResource("d")))
 
 // Look up one triple matching the given subject
 triples := g.All(nil, nil, NewResource("c")) //
-for triple := range triples {
+for _, triple := range triples {
 	triple.String()
 }
 // Returns a single triple that matches object <c>:
 // <a> <b> <c> .
 
 triples = g.All(nil, NewResource("b"), nil)
-for triple := range triples {
+for _, triple := range triples {
 	triple.String()
 }
 // Returns all triples that match subject <b>: 
@@ -153,7 +150,7 @@ Currently, the supported parsing formats are Turtle (with mime type `text/turtle
 baseUri := "https://example.org/foo"
 
 // Create a new graph
-g, _ := NewGraph(baseUri)
+g := NewGraph(baseUri)
 
 // r is of type io.Reader
 g.Parse(r, "text/turtle")
@@ -166,7 +163,7 @@ g.Parse(r, "text/turtle")
 baseUri := "https://example.org/foo"
 
 // Create a new graph
-g, _ := NewGraph(baseUri)
+g := NewGraph(baseUri)
 
 // r is an io.Reader
 g.Parse(r, "application/ld+json")
@@ -188,7 +185,7 @@ skipVerify := false
 
 // Create a new graph. You can also omit the skipVerify parameter
 // and accept invalid certificates (e.g. self-signed)
-g, _ := NewGraph(uri, skipVerify)
+g := NewGraph(uri, skipVerify)
 
 err := g.LoadURI(uri)
 if err != nil {
@@ -212,7 +209,7 @@ Currently, the supported serialization formats are Turtle (with mime type `text/
 baseUri := "https://example.org/foo"
 
 // Create a new graph
-g, _ := NewGraph(baseUri)
+g := NewGraph(baseUri)
 
 triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
 g.Add(triple)
@@ -228,7 +225,7 @@ g.Serialize(w, "text/turtle")
 baseUri := "https://example.org/foo"
 
 // Create a new graph
-g, _ := NewGraph(baseUri)
+g := NewGraph(baseUri)
 
 triple := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
 g.Add(triple)
