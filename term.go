@@ -22,7 +22,6 @@ package rdf2go
 import (
 	"fmt"
 	"math/rand"
-	"strconv"
 	"strings"
 
 	rdf "github.com/deiu/gon3"
@@ -146,26 +145,26 @@ func (term Literal) Equal(other Term) bool {
 
 // BlankNode is an RDF blank node i.e. an unqualified URI/IRI.
 type BlankNode struct {
-	ID int
+	ID string
 }
 
 // NewBlankNode returns a new blank node with the given ID.
-func NewBlankNode(id int) (term Term) {
+func NewBlankNode(id string) (term Term) {
 	return Term(&BlankNode{ID: id})
 }
 
 // NewAnonNode returns a new blank node with a pseudo-randomly generated ID.
 func NewAnonNode() (term Term) {
-	return Term(&BlankNode{ID: rand.Int()})
+	return Term(&BlankNode{ID: fmt.Sprint("_a:", rand.Int())})
 }
 
 // String returns the NTriples representation of the blank node.
 func (term BlankNode) String() string {
-	return "_:n" + fmt.Sprintf("%d", term.ID)
+	return "_:" + fmt.Sprintf("%s", term.ID)
 }
 
 func (term BlankNode) RawValue() string {
-	return fmt.Sprintf("%d", term.ID)
+	return fmt.Sprintf("%s", term.ID)
 }
 
 // Equal returns whether this blank node is equivalent to another.
@@ -204,8 +203,8 @@ func term2rdf(t Term) rdf.Term {
 func rdf2term(term rdf.Term) Term {
 	switch term := term.(type) {
 	case *rdf.BlankNode:
-		id, _ := strconv.Atoi(term.RawValue())
-		return NewBlankNode(id)
+		// id := fmt.Sprint(term.Id)
+		return NewBlankNode(term.RawValue())
 	case *rdf.Literal:
 		if len(term.LanguageTag) > 0 {
 			return NewLiteralWithLanguage(term.LexicalForm, term.LanguageTag)
@@ -223,8 +222,8 @@ func rdf2term(term rdf.Term) Term {
 func jterm2term(term jsonld.Term) Term {
 	switch term := term.(type) {
 	case *jsonld.BlankNode:
-		id, _ := strconv.Atoi(term.RawValue())
-		return NewBlankNode(id)
+		// id, _ := strconv.Atoi(term.RawValue())
+		return NewBlankNode(term.RawValue())
 	case *jsonld.Literal:
 		if len(term.Language) > 0 {
 			return NewLiteralWithLanguage(term.RawValue(), term.Language)
