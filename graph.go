@@ -170,8 +170,8 @@ func (g *Graph) All(s Term, p Term, o Term) []*Triple {
 }
 
 // Merge is used to add all the triples form another graph to this one
-func (g *Graph) Merge(toMerge *Graph){
-	for triple := range toMerge.IterTriples(){
+func (g *Graph) Merge(toMerge *Graph) {
+	for triple := range toMerge.IterTriples() {
 		g.Add(triple)
 	}
 }
