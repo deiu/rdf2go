@@ -155,16 +155,16 @@ func NewBlankNode(id string) (term Term) {
 
 // NewAnonNode returns a new blank node with a pseudo-randomly generated ID.
 func NewAnonNode() (term Term) {
-	return Term(&BlankNode{ID: fmt.Sprint("_a:", rand.Int())})
+	return Term(&BlankNode{ID: fmt.Sprint("n", rand.Int())})
 }
 
 // String returns the NTriples representation of the blank node.
 func (term BlankNode) String() string {
-	return "_:" + fmt.Sprintf("%s", term.ID)
+	return "_:" + term.ID
 }
 
 func (term BlankNode) RawValue() string {
-	return fmt.Sprintf("%s", term.ID)
+	return term.ID
 }
 
 // Equal returns whether this blank node is equivalent to another.
