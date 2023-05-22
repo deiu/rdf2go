@@ -1,8 +1,9 @@
 package rdf2go
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type fakeTerm struct {
@@ -67,9 +68,9 @@ func TestTermNewLiteralWithDatatype(t *testing.T) {
 }
 
 func TestTermNewBlankNode(t *testing.T) {
-	id := NewBlankNode(1)
+	id := NewBlankNode("n1")
 	assert.Equal(t, "_:n1", id.String())
-	assert.Equal(t, "1", id.RawValue())
+	assert.Equal(t, "n1", id.RawValue())
 }
 
 func TestTermNewAnonNode(t *testing.T) {
@@ -79,10 +80,10 @@ func TestTermNewAnonNode(t *testing.T) {
 }
 
 func TestTermBNodeEqual(t *testing.T) {
-	id1 := NewBlankNode(1)
-	id2 := NewBlankNode(1)
+	id1 := NewBlankNode("n1")
+	id2 := NewBlankNode("n1")
 	assert.True(t, id1.Equal(id2))
-	id3 := NewBlankNode(2)
+	id3 := NewBlankNode("n2")
 	assert.False(t, id1.Equal(id3))
 	assert.False(t, id1.Equal(NewResource(testUri)))
 }
@@ -103,7 +104,7 @@ func TestAtLang(t *testing.T) {
 func TestEncodeTerm(t *testing.T) {
 	iterm := NewResource(testUri)
 	assert.Equal(t, iterm.String(), encodeTerm(iterm))
-	iterm = NewBlankNode(1)
+	iterm = NewBlankNode("n1")
 	assert.Equal(t, iterm.String(), encodeTerm(iterm))
 	iterm = NewLiteral("value")
 	assert.Equal(t, iterm.String(), encodeTerm(iterm))

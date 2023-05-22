@@ -186,6 +186,9 @@ func (g *Graph) Parse(reader io.Reader, mime string) error {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(reader)
 		jsonData, err := jsonld.ReadJSON(buf.Bytes())
+		if err != nil {
+			return err
+		}
 		options := &jsonld.Options{}
 		options.Base = ""
 		options.ProduceGeneralizedRdf = false
