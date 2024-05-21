@@ -103,15 +103,17 @@ func (g *Graph) One(s Term, p Term, o Term) *Triple {
 	return nil
 }
 
-// IterTriples iterates through all the triples in a graph
+// IterTriples provides a channel containing all the triples in the graph.
+// Note that the returned channel is already closed.
 func (g *Graph) IterTriples() (ch chan *Triple) {
-	ch = make(chan *Triple)
-	go func() {
-		for triple := range g.triples {
-			ch <- triple
-		}
-		close(ch)
-	}()
+	// This function returns a channel rather than a slice for backwards compatibility.
+	// It does not use a goroutine to populate the channel because that can trigger Go's 'concurrent map misuse'
+	// detector, and would have little performance benefit.
+	ch = make(chan *Triple, len(g.triples))
+	for triple := range g.triples {
+		ch <- triple
+	}
+	close(ch)
 	return ch
 }
 
