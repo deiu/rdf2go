@@ -1,8 +1,16 @@
 package rdf2go
 
-import (
-	"regexp"
-)
+import "mime"
+
+// normalizeMime strips parameters such as "; charset=utf-8" from a media
+// type and lowercases it so it can be used as a lookup key. Unparseable
+// values are returned unchanged.
+func normalizeMime(value string) string {
+	if mt, _, err := mime.ParseMediaType(value); err == nil {
+		return mt
+	}
+	return value
+}
 
 var mimeParser = map[string]string{
 	"text/turtle":               "turtle",
@@ -14,22 +22,3 @@ var mimeSerializer = map[string]string{
 	"application/ld+json": "jsonld",
 	"text/html":           "internal",
 }
-
-var mimeRdfExt = map[string]string{
-	".ttl":    "text/turtle",
-	".n3":     "text/n3",
-	".rdf":    "application/rdf+xml",
-	".jsonld": "application/ld+json",
-}
-
-var rdfExtensions = []string{
-	".ttl",
-	".n3",
-	".rdf",
-	".jsonld",
-}
-
-var (
-	serializerMimes = []string{}
-	validMimeType   = regexp.MustCompile(`^\w+/\w+$`)
-)

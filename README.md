@@ -1,15 +1,18 @@
 # rdf2go
 
-[![Build Status](https://api.travis-ci.org/deiu/rdf2go.svg?branch=master)](https://travis-ci.org/deiu/rdf2go)
-[![Coverage Status](https://coveralls.io/repos/github/deiu/rdf2go/badge.svg?branch=master)](https://coveralls.io/github/deiu/rdf2go?branch=master)
+[![CI](https://github.com/deiu/rdf2go/actions/workflows/ci.yml/badge.svg)](https://github.com/deiu/rdf2go/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/deiu/rdf2go.svg)](https://pkg.go.dev/github.com/deiu/rdf2go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/deiu/rdf2go)](https://goreportcard.com/report/github.com/deiu/rdf2go)
 
 Native golang parser/serializer from/to Turtle and JSON-LD.
 
 # Installation
 
-Just go get it!
+```
+go get github.com/deiu/rdf2go
+```
 
-`go get -u github.com/deiu/rdf2go`
+Requires Go 1.23 or newer.
 
 # Example usage
 
@@ -20,7 +23,7 @@ Just go get it!
 baseUri := "https://example.org/foo"
 
 // Create a new graph
-g := (baseUri)
+g := NewGraph(baseUri)
 
 // Add a few triples to the graph
 triple1 := NewTriple(NewResource("a"), NewResource("b"), NewResource("c"))
@@ -217,6 +220,45 @@ g.Add(triple)
 // w is of type io.Writer
 g.Serialize(w, "text/turtle")
 ```
+
+#### Using namespace prefixes
+
+By default the Turtle serializer writes every IRI in full. Register namespace
+prefixes on the graph with `AddPrefix` and the serializer will shorten matching
+IRIs (including literal datatypes) and emit an `@prefix` header. Only the
+prefixes actually used in the output are written. `AddPrefix` returns an error
+if the label is not a valid Turtle prefix (for example if it contains a colon).
+
+Output is deterministic: prefixes, subjects and predicate/object lines are
+sorted, so the same graph always serializes to the same bytes.
+
+```golang
+g := NewGraph("https://example.org/foo")
+g.AddPrefix("foaf", "http://xmlns.com/foaf/0.1/")
+g.AddPrefix("xsd", "http://www.w3.org/2001/XMLSchema#")
+
+me := NewResource("https://example.org/foo#me")
+g.AddTriple(me, NewResource("http://xmlns.com/foaf/0.1/name"), NewLiteral("Alice"))
+g.AddTriple(me, NewResource("http://xmlns.com/foaf/0.1/age"),
+	NewLiteralWithDatatype("42", NewResource("http://www.w3.org/2001/XMLSchema#integer")))
+
+g.Serialize(w, "text/turtle")
+```
+
+Output:
+
+```turtle
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://example.org/foo#me>
+  foaf:age "42"^^xsd:integer ;
+  foaf:name "Alice" .
+```
+
+IRIs whose local part contains characters that cannot appear unescaped in a
+prefixed name (for example `/` or a trailing `.`) are kept in full `<...>` form.
+Prefixes are not inherited from parsed documents; add them explicitly.
 
 ### Serializing to JSON-LD
 

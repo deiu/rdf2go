@@ -1,0 +1,9 @@
+# Build and test artifacts
+*.test
+*.out
+coverage.*
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
