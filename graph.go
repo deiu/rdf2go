@@ -283,7 +283,7 @@ func (g *Graph) serializeTurtle(w io.Writer) error {
 			o := encodeTerm(triple.Object)
 
 			if key == len(triples)-1 {
-				_, err = fmt.Fprintf(w, "  %s %s .", p, o)
+				_, err = fmt.Fprintf(w, "  %s %s .\n", p, o)
 				if err != nil {
 					return err
 				}

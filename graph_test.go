@@ -174,7 +174,7 @@ func TestSerializeTurtle(t *testing.T) {
 
 	b := new(bytes.Buffer)
 	g.Serialize(b, "text/turtle")
-	assert.Equal(t, "<a>\n  <b> <c> .", b.String())
+	assert.Equal(t, "<a>\n  <b> <c> .\n", b.String())
 
 	triple2 := NewTriple(NewResource("a"), NewResource("b"), NewResource("d"))
 	g.Add(triple2)
@@ -185,6 +185,21 @@ func TestSerializeTurtle(t *testing.T) {
 	g2 := NewGraph(testUri)
 	g2.Parse(toParse, "text/turtle")
 	assert.Equal(t, 2, g2.Len())
+}
+
+func TestSerializeTurtleMultipleSubjects(t *testing.T) {
+	g := NewGraph(testUri)
+	g.Add(NewTriple(NewResource("a"), NewResource("p"), NewResource("c")))
+	g.Add(NewTriple(NewResource("b"), NewResource("p"), NewResource("d")))
+
+	b := new(bytes.Buffer)
+	g.Serialize(b, "text/turtle")
+	out := b.String()
+	// every subject block must end with " ." followed by a newline
+	assert.Equal(t, 2, strings.Count(out, " .\n"))
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		assert.False(t, strings.Contains(line, ".<"), "statements run together on one line: %q", line)
+	}
 }
 
 func TestParseJSONLD(t *testing.T) {
@@ -217,17 +232,17 @@ func TestGraphMerge(t *testing.T) {
 	g.AddTriple(NewResource("a"), NewResource("b"), NewResource("c"))
 	g.AddTriple(NewResource("a"), NewResource("b"), NewResource("d"))
 	g.AddTriple(NewResource("a"), NewResource("f"), NewLiteral("h"))
-	assert.Equal(t,3,g.Len())
+	assert.Equal(t, 3, g.Len())
 	g2.AddTriple(NewResource("g"), NewResource("b2"), NewResource("e"))
 	g2.AddTriple(NewResource("g"), NewResource("b2"), NewResource("c"))
-	assert.Equal(t,2,g2.Len())
+	assert.Equal(t, 2, g2.Len())
 
 	g.Merge(g2)
 
-	assert.Equal(t,5,g.Len())
-    assert.NotEqual(t,nil,g.One(NewResource("a"),NewResource("b"),NewResource("c")))
-	assert.NotEqual(t,nil,g.One(NewResource("a"),NewResource("b"),NewResource("d")))
-	assert.NotEqual(t,nil,g.One(NewResource("a"),NewResource("f"),NewResource("h")))
-	assert.NotEqual(t,nil,g.One(NewResource("g"),NewResource("b2"),NewResource("e")))
-	assert.NotEqual(t,nil,g.One(NewResource("g"),NewResource("b2"),NewResource("c")))
+	assert.Equal(t, 5, g.Len())
+	assert.NotEqual(t, nil, g.One(NewResource("a"), NewResource("b"), NewResource("c")))
+	assert.NotEqual(t, nil, g.One(NewResource("a"), NewResource("b"), NewResource("d")))
+	assert.NotEqual(t, nil, g.One(NewResource("a"), NewResource("f"), NewResource("h")))
+	assert.NotEqual(t, nil, g.One(NewResource("g"), NewResource("b2"), NewResource("e")))
+	assert.NotEqual(t, nil, g.One(NewResource("g"), NewResource("b2"), NewResource("c")))
 }
