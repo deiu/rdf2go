@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
 
 	rdf "github.com/deiu/gon3"
 	jsonld "github.com/linkeddata/gojsonld"
@@ -19,6 +21,7 @@ type Graph struct {
 	httpClient *http.Client
 	uri        string
 	term       Term
+	prefixes   map[string]string
 }
 
 // NewHttpClient creates an http.Client to be used for parsing resources
@@ -44,8 +47,40 @@ func NewGraph(uri string, skipVerify ...bool) *Graph {
 		httpClient: NewHttpClient(skip),
 		uri:        uri,
 		term:       NewResource(uri),
+		prefixes:   make(map[string]string),
 	}
 	return g
+}
+
+// AddPrefix registers a namespace prefix used by the Turtle serializer to
+// shorten IRIs. The prefix is the short label without the trailing colon
+// (e.g. "foaf") and the namespace is the full IRI it stands for
+// (e.g. "http://xmlns.com/foaf/0.1/"). An empty prefix is allowed and
+// produces names of the form ":local". It returns an error when the label
+// cannot be written as a Turtle prefix or the namespace is empty.
+func (g *Graph) AddPrefix(prefix string, namespace string) error {
+	if !isValidPrefixLabel(prefix) {
+		return fmt.Errorf("rdf2go: invalid prefix label %q", prefix)
+	}
+	if len(namespace) == 0 {
+		return errors.New("rdf2go: prefix namespace must not be empty")
+	}
+	g.prefixes[prefix] = namespace
+	return nil
+}
+
+// RemovePrefix drops a namespace prefix previously added with AddPrefix.
+func (g *Graph) RemovePrefix(prefix string) {
+	delete(g.prefixes, prefix)
+}
+
+// Prefixes returns a copy of the namespace prefixes registered on the graph.
+func (g *Graph) Prefixes() map[string]string {
+	out := make(map[string]string, len(g.prefixes))
+	for k, v := range g.prefixes {
+		out[k] = v
+	}
+	return out
 }
 
 // Len returns the length of the graph as number of triples in the graph
@@ -180,7 +215,7 @@ func (g *Graph) Merge(toMerge *Graph) {
 
 // Parse is used to parse RDF data from a reader, using the provided mime type
 func (g *Graph) Parse(reader io.Reader, mime string) error {
-	parserName := mimeParser[mime]
+	parserName := mimeParser[normalizeMime(mime)]
 	if len(parserName) == 0 {
 		parserName = "guess"
 	}
@@ -233,11 +268,10 @@ func (g *Graph) LoadURI(uri string) error {
 	}
 	if r != nil {
 		defer r.Body.Close()
-		if r.StatusCode == 200 {
-			g.Parse(r.Body, r.Header.Get("Content-Type"))
-		} else {
-			return fmt.Errorf("Could not fetch graph from %s - HTTP %d", uri, r.StatusCode)
+		if r.StatusCode == http.StatusOK {
+			return g.Parse(r.Body, r.Header.Get("Content-Type"))
 		}
+		return fmt.Errorf("could not fetch graph from %s: HTTP %d", uri, r.StatusCode)
 	}
 	return nil
 }
@@ -253,7 +287,7 @@ func (g *Graph) String() string {
 
 // Serialize is used to serialize a graph based on a given mime type
 func (g *Graph) Serialize(w io.Writer, mime string) error {
-	serializerName := mimeSerializer[mime]
+	serializerName := mimeSerializer[normalizeMime(mime)]
 	if serializerName == "jsonld" {
 		return g.serializeJSONLD(w)
 	}
@@ -261,43 +295,179 @@ func (g *Graph) Serialize(w io.Writer, mime string) error {
 	return g.serializeTurtle(w)
 }
 
-// @TODO improve streaming
+// serializeTurtle writes the graph as Turtle. Output is deterministic:
+// @prefix directives, subjects and predicate/object lines are all sorted.
 func (g *Graph) serializeTurtle(w io.Writer) error {
-	var err error
+	c := newCompacter(g.prefixes)
 
-	triplesBySubject := make(map[string][]*Triple)
-
+	// Encode everything first so that only the prefixes actually used end
+	// up in the @prefix header.
+	body := make(map[string][]string)
 	for triple := range g.IterTriples() {
-		s := encodeTerm(triple.Subject)
-		triplesBySubject[s] = append(triplesBySubject[s], triple)
+		s := c.encode(triple.Subject)
+		body[s] = append(body[s], c.encode(triple.Predicate)+" "+c.encode(triple.Object))
 	}
 
-	for subject, triples := range triplesBySubject {
-		_, err = fmt.Fprintf(w, "%s\n", subject)
-		if err != nil {
+	subjects := make([]string, 0, len(body))
+	for s := range body {
+		subjects = append(subjects, s)
+	}
+	sort.Strings(subjects)
+
+	for _, prefix := range c.usedPrefixes() {
+		if _, err := fmt.Fprintf(w, "@prefix %s: <%s> .\n", prefix, g.prefixes[prefix]); err != nil {
 			return err
 		}
+	}
+	if len(c.used) > 0 {
+		if _, err := io.WriteString(w, "\n"); err != nil {
+			return err
+		}
+	}
 
-		for key, triple := range triples {
-			p := encodeTerm(triple.Predicate)
-			o := encodeTerm(triple.Object)
-
-			if key == len(triples)-1 {
-				_, err = fmt.Fprintf(w, "  %s %s .\n", p, o)
-				if err != nil {
-					return err
-				}
-				break
+	for _, subject := range subjects {
+		if _, err := fmt.Fprintf(w, "%s\n", subject); err != nil {
+			return err
+		}
+		lines := body[subject]
+		sort.Strings(lines)
+		for i, l := range lines {
+			sep := " ;"
+			if i == len(lines)-1 {
+				sep = " ."
 			}
-			_, err = fmt.Fprintf(w, "  %s %s ;\n", p, o)
-			if err != nil {
+			if _, err := fmt.Fprintf(w, "  %s%s\n", l, sep); err != nil {
 				return err
 			}
 		}
-
 	}
 
 	return nil
+}
+
+// compacter shortens IRIs into prefixed names using a set of namespaces and
+// remembers which prefixes it actually used. It is created per Serialize
+// call so the bookkeeping never leaks between runs.
+type compacter struct {
+	// namespaces sorted by IRI length, longest first, so that the most
+	// specific namespace wins when several share a common root.
+	entries []prefixEntry
+	used    map[string]bool
+	cache   map[string]string
+}
+
+type prefixEntry struct {
+	prefix    string
+	namespace string
+}
+
+func newCompacter(prefixes map[string]string) *compacter {
+	c := &compacter{
+		used:  make(map[string]bool),
+		cache: make(map[string]string),
+	}
+	for p, ns := range prefixes {
+		if len(ns) == 0 || !isValidPrefixLabel(p) {
+			continue
+		}
+		c.entries = append(c.entries, prefixEntry{prefix: p, namespace: ns})
+	}
+	sort.Slice(c.entries, func(i, j int) bool {
+		if len(c.entries[i].namespace) != len(c.entries[j].namespace) {
+			return len(c.entries[i].namespace) > len(c.entries[j].namespace)
+		}
+		return c.entries[i].prefix < c.entries[j].prefix
+	})
+	return c
+}
+
+// usedPrefixes returns the prefixes consumed so far, sorted alphabetically.
+func (c *compacter) usedPrefixes() []string {
+	out := make([]string, 0, len(c.used))
+	for p := range c.used {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// compactIRI returns the prefixed form of an IRI when one of the registered
+// namespaces matches and the remainder is a valid Turtle local name.
+// Otherwise it returns the IRI wrapped in angle brackets.
+func (c *compacter) compactIRI(iri string) string {
+	if out, ok := c.cache[iri]; ok {
+		return out
+	}
+	out := bracketIRI(iri)
+	for _, e := range c.entries {
+		if !strings.HasPrefix(iri, e.namespace) {
+			continue
+		}
+		local := iri[len(e.namespace):]
+		if !isValidLocalName(local) {
+			continue
+		}
+		c.used[e.prefix] = true
+		out = e.prefix + ":" + local
+		break
+	}
+	c.cache[iri] = out
+	return out
+}
+
+// encode renders a term in Turtle syntax, compacting IRIs where possible.
+func (c *compacter) encode(iterm Term) string {
+	return encodeTermWith(iterm, c.compactIRI)
+}
+
+// isValidPrefixLabel reports whether s can be used as the label of a Turtle
+// @prefix directive. It accepts a conservative subset of the PN_PREFIX
+// production: an empty string, or an ASCII letter followed by letters,
+// digits, '_', '-' and '.', not ending with '.'.
+func isValidPrefixLabel(s string) bool {
+	if len(s) == 0 {
+		return true
+	}
+	if !isASCIILetter(s[0]) {
+		return false
+	}
+	return isValidNameTail(s[1:])
+}
+
+// isValidLocalName reports whether s can be written unescaped as the local
+// part of a Turtle prefixed name. It accepts a conservative subset of the
+// PN_LOCAL production: ASCII letters, digits, '_', '-' and '.', where the
+// first character is a letter, digit or '_' and the name does not end with
+// '.'. Any other character forces the full IRI form.
+func isValidLocalName(s string) bool {
+	if len(s) == 0 {
+		return true
+	}
+	ch := s[0]
+	if !isASCIILetter(ch) && !isASCIIDigit(ch) && ch != '_' {
+		return false
+	}
+	return isValidNameTail(s[1:])
+}
+
+// isValidNameTail checks the characters allowed after the first one in a
+// prefix label or local name.
+func isValidNameTail(s string) bool {
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if !isASCIILetter(ch) && !isASCIIDigit(ch) && ch != '_' && ch != '-' && ch != '.' {
+			return false
+		}
+	}
+	return len(s) == 0 || s[len(s)-1] != '.'
+}
+
+func isASCIILetter(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+}
+
+func isASCIIDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9'
 }
 
 // func (g *Graph) serializeJSONLD(w io.Writer) error {
@@ -344,7 +514,6 @@ func (g *Graph) serializeJSONLD(w io.Writer) error {
 					"@id": t.URI,
 				},
 			}
-			break
 		case *Literal:
 			v := map[string]string{
 				"@value": t.Value,
@@ -359,10 +528,10 @@ func (g *Graph) serializeJSONLD(w io.Writer) error {
 		}
 		r = append(r, one)
 	}
-	bytes, err := json.Marshal(r)
+	out, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(w, string(bytes))
-	return nil
+	_, err = w.Write(out)
+	return err
 }

@@ -29,7 +29,11 @@ func MockServer() http.Handler {
 		w.Header().Add("Content-Type", "text/turtle")
 		w.WriteHeader(200)
 		w.Write([]byte(simpleTurtle))
-		return
+	}))
+	handler.Handle("/charset", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Add("Content-Type", "text/turtle; charset=utf-8")
+		w.WriteHeader(200)
+		w.Write([]byte(simpleTurtle))
 	}))
 	return handler
 }
@@ -200,6 +204,186 @@ func TestSerializeTurtleMultipleSubjects(t *testing.T) {
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		assert.False(t, strings.Contains(line, ".<"), "statements run together on one line: %q", line)
 	}
+}
+
+func TestSerializeTurtleWithPrefixes(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddPrefix("foaf", "http://xmlns.com/foaf/0.1/")
+	g.AddPrefix("xsd", "http://www.w3.org/2001/XMLSchema#")
+	g.AddPrefix("unused", "http://example.org/unused#")
+	g.AddTriple(NewResource("http://example.org/#me"), NewResource("http://xmlns.com/foaf/0.1/name"), NewLiteral("Test"))
+	g.AddTriple(NewResource("http://example.org/#me"), NewResource("http://xmlns.com/foaf/0.1/age"),
+		NewLiteralWithDatatype("42", NewResource("http://www.w3.org/2001/XMLSchema#integer")))
+
+	b := new(bytes.Buffer)
+	assert.NoError(t, g.Serialize(b, "text/turtle"))
+	out := b.String()
+
+	// header lists only the prefixes that were used, sorted, followed by a blank line
+	assert.True(t, strings.HasPrefix(out,
+		"@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n"), out)
+	assert.False(t, strings.Contains(out, "unused"), out)
+
+	assert.Contains(t, out, "<http://example.org/#me>\n")
+	assert.Contains(t, out, "foaf:name \"Test\"")
+	assert.Contains(t, out, "foaf:age \"42\"^^xsd:integer")
+	assert.False(t, strings.Contains(out, "<http://xmlns.com/foaf/0.1/name>"), out)
+
+	// the output must parse back into an equal graph
+	g2 := NewGraph(testUri)
+	assert.NoError(t, g2.Parse(strings.NewReader(out), "text/turtle"))
+	assert.Equal(t, g.Len(), g2.Len())
+	for triple := range g.IterTriples() {
+		assert.NotNil(t, g2.One(triple.Subject, triple.Predicate, triple.Object), triple.String())
+	}
+}
+
+func TestLoadURIWithContentTypeParameters(t *testing.T) {
+	g := NewGraph(testUri)
+	assert.NoError(t, g.LoadURI(testServer.URL+"/charset"))
+	assert.Equal(t, 2, g.Len())
+}
+
+func TestParseNormalizesMime(t *testing.T) {
+	g := NewGraph(testUri)
+	assert.NoError(t, g.Parse(strings.NewReader(simpleTurtle), "Text/Turtle; charset=UTF-8"))
+	assert.Equal(t, 2, g.Len())
+}
+
+func TestSerializeTurtleIsDeterministic(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddTriple(NewResource("b"), NewResource("p"), NewResource("o"))
+	g.AddTriple(NewResource("a"), NewResource("q"), NewResource("o"))
+	g.AddTriple(NewResource("a"), NewResource("p"), NewResource("o2"))
+	g.AddTriple(NewResource("a"), NewResource("p"), NewResource("o1"))
+
+	want := "<a>\n  <p> <o1> ;\n  <p> <o2> ;\n  <q> <o> .\n<b>\n  <p> <o> .\n"
+	for i := 0; i < 20; i++ {
+		b := new(bytes.Buffer)
+		assert.NoError(t, g.Serialize(b, "text/turtle"))
+		assert.Equal(t, want, b.String())
+	}
+}
+
+func TestAddPrefixRejectsInvalidLabels(t *testing.T) {
+	g := NewGraph(testUri)
+	assert.NoError(t, g.AddPrefix("", "http://example.org/"))
+	assert.NoError(t, g.AddPrefix("ex", "http://example.org/"))
+	assert.NoError(t, g.AddPrefix("a-b.c1", "http://example.org/"))
+	assert.Error(t, g.AddPrefix("ex:", "http://example.org/"))
+	assert.Error(t, g.AddPrefix("_", "http://example.org/"))
+	assert.Error(t, g.AddPrefix("1x", "http://example.org/"))
+	assert.Error(t, g.AddPrefix("a b", "http://example.org/"))
+	assert.Error(t, g.AddPrefix("a.", "http://example.org/"))
+	assert.Error(t, g.AddPrefix("ok", ""))
+	assert.Len(t, g.Prefixes(), 3)
+}
+
+func TestSerializeTurtleEmptyPrefix(t *testing.T) {
+	g := NewGraph(testUri)
+	assert.NoError(t, g.AddPrefix("", "http://example.org/"))
+	g.AddTriple(NewResource("http://example.org/s"), NewResource("http://example.org/p"), NewResource("http://example.org/o"))
+	b := new(bytes.Buffer)
+	assert.NoError(t, g.Serialize(b, "text/turtle"))
+	assert.Equal(t, "@prefix : <http://example.org/> .\n\n:s\n  :p :o .\n", b.String())
+
+	g2 := NewGraph(testUri)
+	assert.NoError(t, g2.Parse(strings.NewReader(b.String()), "text/turtle"))
+	assert.Equal(t, 1, g2.Len())
+}
+
+// customTerm is a user-defined Term implementation used to check that the
+// serializer does not assume datatypes are *Resource values.
+type customTerm struct{ iri string }
+
+func (c *customTerm) String() string    { return "<" + c.iri + ">" }
+func (c *customTerm) RawValue() string  { return c.iri }
+func (c *customTerm) Equal(o Term) bool { return false }
+
+func TestSerializeTurtleCustomDatatypeTerm(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddPrefix("xsd", "http://www.w3.org/2001/XMLSchema#")
+	g.AddTriple(NewResource("s"), NewResource("p"), NewLiteralWithDatatype("42", &customTerm{iri: "http://www.w3.org/2001/XMLSchema#integer"}))
+	b := new(bytes.Buffer)
+	assert.NoError(t, g.Serialize(b, "text/turtle"))
+	// a datatype that is not a *Resource falls back to its own String()
+	assert.Contains(t, b.String(), "\"42\"^^<http://www.w3.org/2001/XMLSchema#integer>")
+	assert.False(t, strings.Contains(b.String(), "@prefix"), b.String())
+}
+
+func TestSerializeTurtleNoPrefixesNoHeader(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddTriple(NewResource("a"), NewResource("b"), NewResource("c"))
+	b := new(bytes.Buffer)
+	assert.NoError(t, g.Serialize(b, "text/turtle"))
+	assert.Equal(t, "<a>\n  <b> <c> .\n", b.String())
+}
+
+func TestSerializeTurtlePrefixFallsBackToFullIRI(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddPrefix("ex", "http://example.org/")
+	// local names with characters outside the safe subset stay as full IRIs
+	g.AddTriple(NewResource("http://example.org/a/b"), NewResource("http://example.org/p"), NewResource("http://example.org/trailing."))
+	g.AddTriple(NewResource("http://example.org/-dash"), NewResource("http://example.org/p"), NewResource("http://example.org/"))
+
+	b := new(bytes.Buffer)
+	assert.NoError(t, g.Serialize(b, "text/turtle"))
+	out := b.String()
+	assert.Contains(t, out, "<http://example.org/a/b>")
+	assert.Contains(t, out, "<http://example.org/trailing.>")
+	assert.Contains(t, out, "<http://example.org/-dash>")
+	assert.Contains(t, out, "ex:p")
+	// empty local name is allowed
+	assert.Contains(t, out, " ex: .")
+
+	g2 := NewGraph(testUri)
+	assert.NoError(t, g2.Parse(strings.NewReader(out), "text/turtle"))
+	assert.Equal(t, 2, g2.Len())
+}
+
+func TestSerializeTurtleLongestPrefixWins(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddPrefix("ex", "http://example.org/")
+	g.AddPrefix("exv", "http://example.org/vocab#")
+	g.AddTriple(NewResource("http://example.org/vocab#Thing"), NewResource("http://example.org/p"), NewResource("http://example.org/o"))
+
+	b := new(bytes.Buffer)
+	assert.NoError(t, g.Serialize(b, "text/turtle"))
+	assert.Contains(t, b.String(), "exv:Thing")
+	assert.Contains(t, b.String(), "ex:p ex:o")
+}
+
+func TestPrefixes(t *testing.T) {
+	g := NewGraph(testUri)
+	g.AddPrefix("ex", "http://example.org/")
+	assert.Equal(t, map[string]string{"ex": "http://example.org/"}, g.Prefixes())
+	g.Prefixes()["ex"] = "mutated"
+	assert.Equal(t, "http://example.org/", g.Prefixes()["ex"])
+	g.RemovePrefix("ex")
+	assert.Empty(t, g.Prefixes())
+}
+
+func TestIsValidPrefixLabel(t *testing.T) {
+	assert.True(t, isValidPrefixLabel(""))
+	assert.True(t, isValidPrefixLabel("ex"))
+	assert.True(t, isValidPrefixLabel("a-b.c1"))
+	assert.False(t, isValidPrefixLabel("1x"))
+	assert.False(t, isValidPrefixLabel("_x"))
+	assert.False(t, isValidPrefixLabel("ex:"))
+	assert.False(t, isValidPrefixLabel("a."))
+	assert.False(t, isValidPrefixLabel("a b"))
+}
+
+func TestIsValidLocalName(t *testing.T) {
+	assert.True(t, isValidLocalName(""))
+	assert.True(t, isValidLocalName("name"))
+	assert.True(t, isValidLocalName("a-b.c_1"))
+	assert.False(t, isValidLocalName("-a"))
+	assert.False(t, isValidLocalName(".a"))
+	assert.False(t, isValidLocalName("a."))
+	assert.False(t, isValidLocalName("a/b"))
+	assert.False(t, isValidLocalName("a:b"))
+	assert.False(t, isValidLocalName("é"))
 }
 
 func TestParseJSONLD(t *testing.T) {

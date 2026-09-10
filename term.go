@@ -94,6 +94,16 @@ func NewLiteralWithDatatype(value string, datatype Term) (term Term) {
 
 // String returns the NTriples representation of this literal.
 func (term Literal) String() string {
+	str := term.lexicalForm()
+	if term.Datatype != nil {
+		str += "^^" + term.Datatype.String()
+	}
+	return str
+}
+
+// lexicalForm returns the quoted, escaped value with its language tag but
+// without the datatype suffix.
+func (term Literal) lexicalForm() string {
 	str := term.Value
 	str = strings.Replace(str, "\\", "\\\\", -1)
 	str = strings.Replace(str, "\"", "\\\"", -1)
@@ -101,18 +111,11 @@ func (term Literal) String() string {
 	str = strings.Replace(str, "\r", "\\r", -1)
 	str = strings.Replace(str, "\t", "\\t", -1)
 
-	str = fmt.Sprintf("\"%s\"", str)
-
-	// if term.Language != "" {
-	str += atLang(term.Language)
-	// } else
-	if term.Datatype != nil {
-		str += "^^" + term.Datatype.String()
-	}
-
-	return str
+	return fmt.Sprintf("\"%s\"", str) + atLang(term.Language)
 }
 
+// RawValue returns the lexical value of the literal without quotes,
+// language tag or datatype.
 func (term Literal) RawValue() string {
 	return term.Value
 }
@@ -163,6 +166,7 @@ func (term BlankNode) String() string {
 	return "_:" + term.ID
 }
 
+// RawValue returns the blank node identifier without the "_:" marker.
 func (term BlankNode) RawValue() string {
 	return term.ID
 }
@@ -256,11 +260,25 @@ func term2jterm(term Term) jsonld.Term {
 	return nil
 }
 
+// encodeTerm renders a term in Turtle/N-Triples syntax with full IRIs.
 func encodeTerm(iterm Term) string {
+	return encodeTermWith(iterm, bracketIRI)
+}
+
+func bracketIRI(iri string) string {
+	return "<" + iri + ">"
+}
+
+// encodeTermWith renders a term in Turtle syntax, delegating the rendering
+// of IRIs (including literal datatypes) to the given function.
+func encodeTermWith(iterm Term, iri func(string) string) string {
 	switch term := iterm.(type) {
 	case *Resource:
-		return fmt.Sprintf("<%s>", term.URI)
+		return iri(term.URI)
 	case *Literal:
+		if dt, ok := term.Datatype.(*Resource); ok {
+			return term.lexicalForm() + "^^" + iri(dt.URI)
+		}
 		return term.String()
 	case *BlankNode:
 		return term.String()
